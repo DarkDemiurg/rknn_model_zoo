@@ -135,7 +135,7 @@ int main(int argc, char **argv)
 
 //            sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
 //            draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
-			sprintf(text, "%s@%d,%d,%d,%d@%.2f\n", cnt++, coco_cls_to_name(det_result->cls_id),
+			sprintf(text, "%s@%d,%d,%d,%d@%.2f\n", coco_cls_to_name(det_result->cls_id),
 	     	   		det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
 	    	sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
