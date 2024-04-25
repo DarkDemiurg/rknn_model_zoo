@@ -30,19 +30,19 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.cc)
 
 #dma
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/allocator/dma)
+#include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/allocator/dma)
 #drm
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/allocator/drm)
+#include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/allocator/drm)
 
 
-set(postprocess_file rknpu2/postprocess.cc)
-set(yolov5_seg_file rknpu2/yolov5_seg.cc)
+#set(postprocess_file postprocess.cc)
+#set(yolov5_seg_file rknpu2/yolov5_seg.cc)
 
 
 add_executable(${PROJECT_NAME}
     main.cc
-    ${postprocess_file}
-    ${yolov5_seg_file}
+    postprocess.cc
+    rknpu2/yolov5.cc
 )
 
 
