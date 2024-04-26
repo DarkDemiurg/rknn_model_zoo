@@ -42,7 +42,7 @@ file(GLOB SRCS ${CMAKE_CURRENT_SOURCE_DIR}/*.cc)
 add_executable(${PROJECT_NAME}
     main.cc
     postprocess.cc
-    rknpu2/yolov5.cc
+    rknpu2/yolov8.cc
 )
 
 
