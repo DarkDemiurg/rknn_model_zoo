@@ -68,16 +68,16 @@ int main(int argc, char **argv)
 
     init_post_process();
 
-    ret = init_yolov5_model(model_path, &rknn_app_ctx);
+    ret = init_yolov8_model(model_path, &rknn_app_ctx);
     if (ret != 0)
     {
-        cerr << "init_yolov5_model fail! ret = " << ret << " model_path = " << model_path << endl;
+        cerr << "init_yolov8_model fail! ret = " << ret << " model_path = " << model_path << endl;
         vid.release();
 
 		deinit_post_process();
 
-		ret = release_yolov5_model(&rknn_app_ctx);
-		if (ret != 0) { cout << "release_yolov5_model fail! ret = " << ret << endl; }
+		ret = release_yolov8_model(&rknn_app_ctx);
+		if (ret != 0) { cout << "release_yolov8_model fail! ret = " << ret << endl; }
     }
 
     image_buffer_t src_image;
@@ -112,10 +112,10 @@ int main(int argc, char **argv)
 
         object_detect_result_list od_results;
 
-        ret = inference_yolov5_model(&rknn_app_ctx, &src_image, &od_results);
+        ret = inference_yolov8_model(&rknn_app_ctx, &src_image, &od_results);
         if (ret != 0)
         {
-            cerr << "init_yolov5_model fail! ret = " << ret << endl;
+            cerr << "init_yolov8_model fail! ret = " << ret << endl;
 	    	break;
         }
 
@@ -159,8 +159,8 @@ int main(int argc, char **argv)
 
     deinit_post_process();
 
-    ret = release_yolov5_model(&rknn_app_ctx);
-    if (ret != 0) { cout << "release_yolov5_model fail! ret = " << ret << endl; }
+    ret = release_yolov8_model(&rknn_app_ctx);
+    if (ret != 0) { cout << "release_yolov8_model fail! ret = " << ret << endl; }
 
     if (src_image.virt_addr != NULL) { free(src_image.virt_addr); }
 
