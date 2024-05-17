@@ -88,6 +88,11 @@ int main(int argc, char **argv)
     zmq::socket_t sock(ctx, zmq::socket_type::pub);
     sock.bind("tcp://127.0.0.1:5555");
 
+    int frame_width = vcap.get(CV_CAP_PROP_FRAME_WIDTH);
+    int frame_height = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
+    VideoWriter video("out.avi", CV_FOURCC('M','J','P','G'),10, Size(frame_width,frame_height),true);
+
+
     static clock_t start, end;
     static double t = 0;
     static int f = 0;
@@ -138,7 +143,7 @@ int main(int argc, char **argv)
 			sprintf(text, "%s@%d,%d,%d,%d@%.2f\n", coco_cls_to_name(det_result->cls_id),
 	     	   		det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
-	    	sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
+            sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
         }
 
         
@@ -146,6 +151,11 @@ int main(int argc, char **argv)
         double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
         t += cpu_time_used;
         f += 1;
+
+	if (f % 5 == 0)
+	{
+	    video.write(frame);
+	}
 
         if (f % 30 == 0)
         {
