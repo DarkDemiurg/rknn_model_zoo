@@ -199,6 +199,7 @@ int main(int argc, char **argv)
         }
 
         msg += base64_encode(mat.data, mat_len);
+        sock.send(zmq::buffer(msg), zmq::send_flags::dontwait);
 
         end = clock();
         double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
