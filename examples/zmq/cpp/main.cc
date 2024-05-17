@@ -88,9 +88,9 @@ int main(int argc, char **argv)
     zmq::socket_t sock(ctx, zmq::socket_type::pub);
     sock.bind("tcp://127.0.0.1:5555");
 
-    int frame_width = vcap.get(CV_CAP_PROP_FRAME_WIDTH);
-    int frame_height = vcap.get(CV_CAP_PROP_FRAME_HEIGHT);
-    VideoWriter video("out.avi", CV_FOURCC('M','J','P','G'),10, Size(frame_width,frame_height),true);
+    int frame_width = vid.get(CAP_PROP_FRAME_WIDTH);
+    int frame_height = vid.get(CAP_PROP_FRAME_HEIGHT);
+    VideoWriter video("out.avi", VideoWriter::fourcc('M','J','P','G'), 10, Size(frame_width,frame_height), true);
 
 
     static clock_t start, end;
@@ -136,11 +136,12 @@ int main(int argc, char **argv)
             int x2 = det_result->box.right;
             int y2 = det_result->box.bottom;
 
-//            draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
+            draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
 
-//            sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
-//            draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
-			sprintf(text, "%s@%d,%d,%d,%d@%.2f\n", coco_cls_to_name(det_result->cls_id),
+            sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
+            draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
+            
+            sprintf(text, "%s@%d,%d,%d,%d@%.2f\n", coco_cls_to_name(det_result->cls_id),
 	     	   		det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
             sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
@@ -154,7 +155,7 @@ int main(int argc, char **argv)
 
 	if (f % 5 == 0)
 	{
-	    video.write(frame);
+	    video.write(src_image);
 	}
 
         if (f % 30 == 0)
