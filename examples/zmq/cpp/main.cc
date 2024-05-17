@@ -97,8 +97,8 @@ int main(int argc, char **argv)
     static double t = 0;
     static int f = 0;
     static int cnt = 0;
-
-    while(true)
+    char c;
+    while(cin >> c)
     {
         start = clock();
 
