@@ -97,9 +97,15 @@ int main(int argc, char **argv)
     static double t = 0;
     static int f = 0;
     static int cnt = 0;
-    char c;
-    while(cin >> c)
+
+    while(true)
     {
+	if (waitKey(33) == 27)
+        {
+            cout << "Exit" << endl;
+            break;
+        }
+
         start = clock();
 
         vid >> m; if (m.empty()) { cerr << "ERROR: Image is empty" << endl; break; }
