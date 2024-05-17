@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 
 	if (f % 5 == 0)
 	{
-	    video.write(src_image);
+	    video.write(mat);
 	}
 
         if (f % 30 == 0)
