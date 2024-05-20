@@ -1,6 +1,7 @@
 #include <cctype>
 #include <ctime>
 #include <iostream>
+#include <string>
 #include <zmq.hpp>
 #include <opencv2/opencv.hpp>
 
@@ -12,6 +13,60 @@
 
 using namespace cv;
 using namespace std;
+
+static const unsigned char base64_table[65] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/**
+* base64_encode - Base64 encode
+* @src: Data to be encoded
+* @len: Length of the data to be encoded
+* @out_len: Pointer to output length variable, or %NULL if not used
+* Returns: Allocated buffer of out_len bytes of encoded data,
+* or empty string on failure
+*/
+std::string base64_encode(const unsigned char *src, size_t len)
+{
+    unsigned char *out, *pos;
+    const unsigned char *end, *in;
+
+    size_t olen;
+
+    olen = 4*((len + 2) / 3); /* 3-byte blocks to 4-byte */
+
+    if (olen < len)
+        return std::string(); /* integer overflow */
+
+    std::string outStr;
+    outStr.resize(olen);
+    out = (unsigned char*)&outStr[0];
+
+    end = src + len;
+    in = src;
+    pos = out;
+    while (end - in >= 3) {
+        *pos++ = base64_table[in[0] >> 2];
+        *pos++ = base64_table[((in[0] & 0x03) << 4) | (in[1] >> 4)];
+        *pos++ = base64_table[((in[1] & 0x0f) << 2) | (in[2] >> 6)];
+        *pos++ = base64_table[in[2] & 0x3f];
+        in += 3;
+    }
+
+    if (end - in) {
+        *pos++ = base64_table[in[0] >> 2];
+        if (end - in == 1) {
+            *pos++ = base64_table[(in[0] & 0x03) << 4];
+            *pos++ = '=';
+        }
+        else {
+            *pos++ = base64_table[((in[0] & 0x03) << 4) |
+                (in[1] >> 4)];
+            *pos++ = base64_table[(in[1] & 0x0f) << 2];
+        }
+        *pos++ = '=';
+    }
+
+    return outStr;
+}
 
 int main(int argc, char **argv)
 {
@@ -99,7 +154,7 @@ int main(int argc, char **argv)
 
         vid >> m; if (m.empty()) { cerr << "ERROR: Image is empty" << endl; break; }
 
-        char text[256];
+	string msg;
 
         resize(m, mat, Size(640, 640), 0, 0, INTER_AREA);
         mat_len = mat.total() * mat.elemSize();
@@ -121,6 +176,7 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < od_results.count; i++)
         {
+	    char text[256];
             object_detect_result *det_result = &(od_results.results[i]);
 //            printf("%s @ (%d %d %d %d) %.3f\n", coco_cls_to_name(det_result->cls_id),
 //                   det_result->box.left, det_result->box.top,
@@ -135,13 +191,17 @@ int main(int argc, char **argv)
 
 //            sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
 //            draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
-			sprintf(text, "%s@%d,%d,%d,%d@%.2f\n", coco_cls_to_name(det_result->cls_id),
+
+            sprintf(text, "%s@%d,%d,%d,%d@%.2f;", coco_cls_to_name(det_result->cls_id),
 	     	   		det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
-	    	sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
+            msg += text;
+//            sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
         }
 
-        
+        msg += base64_encode(mat.data, mat_len);
+        sock.send(zmq::buffer(msg), zmq::send_flags::dontwait);
+
         end = clock();
         double cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
         t += cpu_time_used;

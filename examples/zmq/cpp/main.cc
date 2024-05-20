@@ -10,6 +10,7 @@
 #include "file_utils.h"
 #include "image_drawing.h"
 
+
 using namespace cv;
 using namespace std;
 
@@ -186,11 +187,11 @@ int main(int argc, char **argv)
             int x2 = det_result->box.right;
             int y2 = det_result->box.bottom;
 
-            draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
+//          draw_rectangle(&src_image, x1, y1, x2 - x1, y2 - y1, COLOR_BLUE, 3);
 
-            sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
-            draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
-            
+//          sprintf(text, "%s %.1f%%", coco_cls_to_name(det_result->cls_id), det_result->prop * 100);
+//          draw_text(&src_image, text, x1, y1 - 20, COLOR_RED, 10);
+
             sprintf(text, "%s@%d,%d,%d,%d@%.2f;", coco_cls_to_name(det_result->cls_id),
 	     	   		det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
