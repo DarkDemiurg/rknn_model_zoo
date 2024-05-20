@@ -199,7 +199,10 @@ int main(int argc, char **argv)
 //            sock.send(zmq::buffer(text), zmq::send_flags::dontwait);
         }
 
-        msg += base64_encode(mat.data, mat_len);
+	vector<uchar> buffer;
+	imencode(".jpg", mat, buffer);
+
+        msg += base64_encode(buffer.data(), buffer.size());
         sock.send(zmq::buffer(msg), zmq::send_flags::dontwait);
 
         end = clock();
