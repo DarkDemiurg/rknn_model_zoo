@@ -139,7 +139,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    Mat m, mat;
+    Mat m;
     vid >> m;
     if (m.empty())
     {
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
         dst_image.width = WIDTH;
         dst_image.height = HEIGHT;
 
-        convert_image(src_image, dst_image, NULL, NULL, 0);
+        convert_image(&src_image, &dst_image, NULL, NULL, 0);
 
         object_detect_result_list od_results;
 
@@ -252,7 +252,7 @@ int main(int argc, char **argv)
             sock.send(zmq::buffer(text), zmq::send_flags::sndmore);
         }
 
-        zmq::message_t img(mat.data, mat_len);
+        zmq::message_t img(dst_image.virt_addr, dst_image.size);
         sock.send(img, zmq::send_flags::dontwait);
 
         end = clock();
