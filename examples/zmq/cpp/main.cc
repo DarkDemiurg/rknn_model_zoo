@@ -175,6 +175,18 @@ int main(int argc, char **argv)
 
     image_buffer_t src_image, dst_image;
 
+    memset(&dst_image, 0, sizeof(image_buffer_t));
+    dst_image.width = WIDTH;
+    dst_image.height = HEIGHT;
+    dst_image.format = IMAGE_FORMAT_RGB888;
+    dst_image.size = get_image_size(&dst_image);
+    dst_image.virt_addr = (unsigned char *)malloc(dst_image.size);
+    if (dst_image.virt_addr == NULL)
+    {
+        printf("malloc buffer size:%d fail!\n", dst_image.size);
+        return -1;
+    }        
+
     zmq::context_t ctx;
     zmq::socket_t sock(ctx, zmq::socket_type::pub);
     sock.bind("tcp://127.0.0.1:5555");
@@ -213,15 +225,11 @@ int main(int argc, char **argv)
             continue;
         }
 
-        memset(&dst_image, 0, sizeof(image_buffer_t));
-        dst_image.width = WIDTH;
-        dst_image.height = HEIGHT;
-
         convert_image(&src_image, &dst_image, NULL, NULL, 0);
 
         object_detect_result_list od_results;
 
-        ret = inference_yolov5_model(&rknn_app_ctx, &src_image, &od_results);
+        ret = inference_yolov5_model(&rknn_app_ctx, &dst_image, &od_results);
         if (ret != 0)
         {
             cerr << "init_yolov5_model fail! ret = " << ret << endl;
@@ -266,6 +274,11 @@ int main(int argc, char **argv)
             t = 0;
             f = 0;
         }
+    }
+
+    if (dst_image.virt_addr != NULL)
+    {
+        free(dst_image.virt_addr);
     }
 
     sock.close();
