@@ -184,7 +184,8 @@ int main(int argc, char **argv)
 
     zmq::context_t ctx;
     zmq::socket_t sock(ctx, zmq::socket_type::pub);
-    sock.setsockopt(ZMQ_SNDBUF, WIDTH * HEIGHT * 8 * 3 * 2);
+    // sock.setsockopt(ZMQ_SNDBUF, WIDTH * HEIGHT * 8 * 3 * 2);
+    sock.set(zmq::sockopt::sndbuf, WIDTH * HEIGHT * 8 * 3 * 2);
     sock.bind("tcp://127.0.0.1:5555");
 
     static clock_t start, end;
