@@ -13,7 +13,7 @@
 using namespace cv;
 using namespace std;
 
-#define SRC_WIDTH  640
+#define SRC_WIDTH 640
 #define SRC_HEIGHT 480
 #define FPS 30
 
@@ -147,11 +147,6 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    // resize(m, mat, Size(WIDTH, HEIGHT), 0, 0, INTER_AREA);
-    // size_t mat_len = mat.total() * mat.elemSize();
-    // cout << "Type: " << mat.type() << endl;
-    // cout << "Size: " << mat_len << endl;
-
     int ret;
     rknn_app_context_t rknn_app_ctx;
     memset(&rknn_app_ctx, 0, sizeof(rknn_app_context_t));
@@ -210,15 +205,6 @@ int main(int argc, char **argv)
 
         string msg;
 
-        // resize(m, mat, Size(640, 640), 0, 0, INTER_AREA);
-        // mat_len = mat.total() * mat.elemSize();
-
-        // src_image.width = 640;
-        // src_image.height = 640;
-        // src_image.size = mat_len;
-        // src_image.virt_addr = mat.data;
-        // src_image.format = IMAGE_FORMAT_RGB888;
-
         memset(&src_image, 0, sizeof(image_buffer_t));
         if (!mat_to_image_buffer(m, src_image, IMAGE_FORMAT_RGB888))
         {
@@ -260,12 +246,11 @@ int main(int argc, char **argv)
             msg += text;
         }
 
-	if (msg.length() == 0) msg = "empty";
+        if (msg.length() == 0)
+            msg = "empty";
 
-	sock.send(zmq::buffer(msg), zmq::send_flags::sndmore);
-//        zmq::message_t img(dst_image.virt_addr, dst_image.size);
-//        sock.send(img, zmq::send_flags::dontwait);
-	sock.send(zmq::buffer(dst_image.virt_addr, dst_image.size), zmq::send_flags::none);
+        sock.send(zmq::buffer(msg), zmq::send_flags::sndmore);
+        sock.send(zmq::buffer(dst_image.virt_addr, dst_image.size), zmq::send_flags::none);
 
         end = clock();
         double cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
