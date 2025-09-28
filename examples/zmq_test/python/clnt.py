@@ -9,5 +9,5 @@ socket.subscribe(b'')
 
 
 while True:
-    message = socket.recv()
-    print("Received detect: %s" % message)
+    message = socket.recv_multipart()
+    print(f"Received {len(message)=}")

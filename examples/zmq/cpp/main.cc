@@ -13,7 +13,7 @@
 using namespace cv;
 using namespace std;
 
-#define SRC_WIDTH 640
+#define SRC_WIDTH  640
 #define SRC_HEIGHT 480
 #define FPS 30
 
@@ -185,10 +185,11 @@ int main(int argc, char **argv)
     {
         printf("malloc buffer size:%d fail!\n", dst_image.size);
         return -1;
-    }        
+    }
 
     zmq::context_t ctx;
     zmq::socket_t sock(ctx, zmq::socket_type::pub);
+    sock.setsockopt(ZMQ_SNDBUF, WIDTH * HEIGHT * 8 * 3 * 2);
     sock.bind("tcp://127.0.0.1:5555");
 
     static clock_t start, end;
@@ -257,11 +258,14 @@ int main(int argc, char **argv)
                     det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
             msg += text;
-            sock.send(zmq::buffer(text), zmq::send_flags::sndmore);
         }
 
-        zmq::message_t img(dst_image.virt_addr, dst_image.size);
-        sock.send(img, zmq::send_flags::dontwait);
+	if (msg.length() == 0) msg = "empty";
+
+	sock.send(zmq::buffer(msg), zmq::send_flags::sndmore);
+//        zmq::message_t img(dst_image.virt_addr, dst_image.size);
+//        sock.send(img, zmq::send_flags::dontwait);
+	sock.send(zmq::buffer(dst_image.virt_addr, dst_image.size), zmq::send_flags::none);
 
         end = clock();
         double cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
