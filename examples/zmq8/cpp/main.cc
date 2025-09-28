@@ -13,8 +13,8 @@
 using namespace cv;
 using namespace std;
 
-#define SRC_WIDTH 640
-#define SRC_HEIGHT 480
+#define SRC_WIDTH 960
+#define SRC_HEIGHT 720
 #define FPS 30
 
 #define WIDTH 640
