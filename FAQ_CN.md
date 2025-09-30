@@ -9,6 +9,8 @@
   - [1.8 为什么其他模型没有demo，是因为不支持吗](#18-为什么其他模型没有demo是因为不支持吗)
   - [1.9 是否有大模型demo](#19-是否有大模型demo)
   - [1.10 为什么RV1103、RV1106能跑的demo较少](#110-为什么rv1103rv1106能跑的demo较少)
+  - [1.11 在 opencv 和 jpeg 库共用时会出现 Segmentation fault 报错](#111-在-opencv-和-jpeg-库共用时会出现-segmentation-fault-报错)
+  - [1.12 在编译阶段报错或者运行时提示找不到某些依赖库](#112-在编译阶段报错或者运行时提示找不到某些依赖库)
 - [2. RGA](#2-rga)
 - [3. YOLO](#3-yolo)
   - [3.1 类别置信度超过1](#31-类别置信度超过1)
@@ -25,10 +27,10 @@
 
 |              | RKNPU1                                                       | RKNPU2                                                       |
 | ------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 对应平台     | RV1109<br />RV1126<br />RK1808<br />RK3399pro                | RV1103<br />RV1106<br />RK3562<br />RK3566<br />RK3568<br />RK3588<br />RK3576 |
+| 对应平台     | RV1109<br />RV1126<br />RK1808<br />RK3399pro                | RV1103<br />RV1106<br />RV1126B<br />RK3562<br />RK3566<br />RK3568<br />RK3588<br />RK3576 |
 | 驱动         | 通过更新.ko文件升级                                          | 通过更新固件升级                                             |
-| runtime      | 参考[文档](https://github.com/airockchip/rknpu/blob/master/README.md)，替换 librknn_runtime.so 及其相关依赖文件升级<br />(如果需要使用python连板调试功能，请同步更新文档中涉及的 rknn_server 文件) | 参考[文档](https://github.com/rockchip-linux/rknn-toolkit2/blob/master/doc/rknn_server_proxy.md)，替换 librknnrt.so 文件升级<br />(RV1103/RV1106 使用裁剪版本的 runtime，对应文件名称为 librknnmrt.so)<br />(如果需要使用 python 连板调试功能，请同步更新文档中涉及的 rknn_server 文件) |
-| RKNN-Toolkit | 参考[文档](https://github.com/airockchip/rknn-toolkit/blob/master/README.md)，安装新的 python whl 文件升级 | 参考[文档](https://github.com/rockchip-linux/rknn-toolkit2/blob/master/doc/02_Rockchip_RKNPU_User_Guide_RKNN_SDK_V1.6.0_CN.pdf) 2.1小节，安装新的 python whl 文件升级 |
+| runtime      | 参考[文档](https://github.com/airockchip/rknpu/blob/master/README.md)，替换 librknn_runtime.so 及其相关依赖文件升级<br />(如果需要使用python连板调试功能，请同步更新文档中涉及的 rknn_server 文件) | 参考[文档](https://github.com/airockchip/rknn-toolkit2/blob/master/doc/rknn_server_proxy.md)，替换 librknnrt.so 文件升级<br />(RV1103/RV1106 使用裁剪版本的 runtime，对应文件名称为 librknnmrt.so)<br />(如果需要使用 python 连板调试功能，请同步更新文档中涉及的 rknn_server 文件) |
+| RKNN-Toolkit | 参考[文档](https://github.com/airockchip/rknn-toolkit/blob/master/README.md)，安装新的 python whl 文件升级 | 参考[文档](https://github.com/airockchip/rknn-toolkit2/blob/master/doc/02_Rockchip_RKNPU_User_Guide_RKNN_SDK_V2.2.0_CN.pdf) 2.1小节，安装新的 python whl 文件升级 |
 
 - 请注意，由于开发板的规格差异，固件通常是互不兼容的，请联系开发板的购买来源获取新固件及烧录方法。
 
@@ -61,13 +63,13 @@
 - rknn model zoo 的推理性能数据不包含前后处理，只统计 rknn.run 的耗时，与完整demo的耗时是存在差异的。这些操作的耗时与使用场景、系统资源占用有关，这部分数据请用户基于实际环境进行测试。
 - 板子是否已经定频、并且达到了[定频脚本](./scaling_frequency.sh)设定的最高频率。部分固件可能限制了CPU/NPU/DDR的最高频率，导致推理性能有所减弱。
 - 是否有其他应用占用了 CPU/NPU 及带宽资源，这会导致推理性能减弱。
-- 对于有大小核CPU的芯片(目前为RK3588, RK3576)，测试时请参考[文档](https://github.com/rockchip-linux/rknn-toolkit2/blob/master/doc/02_Rockchip_RKNPU_User_Guide_RKNN_SDK_V1.6.0_CN.pdf)的5.3.3小节，绑定CPU大核进行测试。
+- 对于有大小核CPU的芯片(目前为RK3588, RK3576)，测试时请参考[文档](https://github.com/airockchip/rknn-toolkit2/blob/master/doc/02_Rockchip_RKNPU_User_Guide_RKNN_SDK_V2.2.0_CN.pdf)的5.3.3小节，绑定CPU大核进行测试。
 
 
 
 ### 1.6 如何解决模型量化掉精度问题
 
-根据平台版本，先参考 [RKNN-Toolkit1文档](https://github.com/airockchip/rknn-toolkit/blob/master/doc/Rockchip_User_Guide_RKNN_Toolkit_V1.7.5_CN.pdf) 、 [RKNN-Toolkit2文档](https://github.com/airockchip/rknn-toolkit2/blob/master/doc/02_Rockchip_RKNPU_User_Guide_RKNN_SDK_V1.6.0_CN.pdf) 确认量化功能的使用是否正确。
+根据平台版本，先参考 [RKNN-Toolkit1文档](https://github.com/airockchip/rknn-toolkit/blob/master/doc/Rockchip_User_Guide_RKNN_Toolkit_V1.7.5_CN.pdf) 、 [RKNN-Toolkit2文档](https://github.com/airockchip/rknn-toolkit2/blob/master/doc/02_Rockchip_RKNPU_User_Guide_RKNN_SDK_V2.2.0_CN.pdf) 确认量化功能的使用是否正确。
 
 如果是模型结构特性、权重分布导致 int8 量化掉精度，请考虑使用混合量化或QAT量化。
 
@@ -75,7 +77,7 @@
 
 ### 1.7 是否有板端 python demo
 
-在板端安装 RKNN-Toolkit-lite，使用对应 demo 的 python 推理脚本，将 `from rknn.api import RKNN` 修改为 `from rknnlite.api import RKNNLite as RKNN` 就可以实现板端的 python 推理。RKNPU1 平台请使用 [RKNN-Toolkit-lite](https://github.com/airockchip/rknn-toolkit/tree/master/rknn-toolkit-lite)，RKNPU2 平台请使用 [RKNN-Toolkit-lite2](https://github.com/airockchip/rknn-toolkit2/tree/master/rknn_toolkit_lite2)。
+在板端安装 RKNN-Toolkit-lite，使用对应 demo 的 python 推理脚本，将 `from rknn.api import RKNN` 修改为 `from rknnlite.api import RKNNLite as RKNN` 就可以实现板端的 python 推理。RKNPU1 平台请使用 [RKNN-Toolkit-lite](https://github.com/airockchip/rknn-toolkit/tree/master/rknn-toolkit-lite)，RKNPU2 平台请使用 [RKNN-Toolkit-lite2](https://github.com/airockchip/rknn-toolkit2/tree/master/rknn-toolkit-lite2)。
 
 （部份示例目前暂缺 python demo，此外更推荐在意性能的用户使用C接口进行部署）
 
@@ -98,6 +100,14 @@
 受限于RV1103、RV1106的内存大小限制，很多模型的内存占用较大，超出板端内存限制，故暂不提供对应的demo 。
 
 
+### 1.11 在 opencv 和 jpeg 库共用时会出现 Segmentation fault 报错
+
+这是因为 opencv 中包含的 jpeg 库和 rknn_model_zoo/3rdparty 中的 jpeg_turbo 库冲突导致。解决办法可以是：  
+1.自己重新编一个不带 jpeg 库的 opencv 库  
+2.如果只想用 opencv 来读取或者保存 jpg 图片的话，可以在 ./build-linux.sh 或者 ./build-android.sh 时指定 '-j' 参数来 disable jpeg_turbo 库  
+
+### 1.12 在编译阶段报错或者运行时提示找不到某些依赖库
+这是因为当前使用的交叉编译器和 rknn_model_zoo 默认使用的交叉编译器不同导致，请按照 [Compilation_Environment_Setup_Guide_CN.md](./docs/Compilation_Environment_Setup_Guide_CN.md) 文档说明使用对应编译器重新编译 (注意:记得删除旧的 build 目录)
 
 ## 2. RGA
 

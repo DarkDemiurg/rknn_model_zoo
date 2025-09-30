@@ -14,6 +14,13 @@ if(TARGET_SOC STREQUAL "rk1808" OR TARGET_SOC STREQUAL "rv1109" OR TARGET_SOC ST
     set(rknpu_whisper_file rknpu1/whisper.cc)
 endif()
 
+if(TARGET_SOC STREQUAL "rv1126b")
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon -march=armv7-a")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -march=armv7-a")
+    endif()
+endif()
+
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../3rdparty/ 3rdparty.out)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../../utils/ utils.out)
 
@@ -77,8 +84,10 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/test.wav DESTINATION ./model)
-install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/vocab.txt DESTINATION ./model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/test_en.wav DESTINATION ./model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/test_zh.wav DESTINATION ./model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/vocab_en.txt DESTINATION ./model)
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/vocab_zh.txt DESTINATION ./model)
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../model/mel_80_filters.txt DESTINATION ./model)
 file(GLOB RKNN_FILES "${CMAKE_CURRENT_SOURCE_DIR}/../model/*.rknn")
 install(FILES ${RKNN_FILES} DESTINATION model)

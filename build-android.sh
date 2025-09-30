@@ -19,7 +19,7 @@ if [[ -e ${ANDROID_NDK_PATH}/source.properties ]];then
 fi
 
 echo "$0 $@"
-while getopts ":t:a:d:b:m" opt; do
+while getopts ":t:a:d:b:m:r:j" opt; do
   case $opt in
     t)
       TARGET_SOC=$OPTARG
@@ -37,6 +37,12 @@ while getopts ":t:a:d:b:m" opt; do
       ENABLE_ASAN=ON
       export ENABLE_ASAN=TRUE
       ;;
+    r)
+      DISABLE_RGA=ON
+      ;;
+    j)
+      DISABLE_LIBJPEG=ON
+      ;;
     :)
       echo "Option -$OPTARG requires an argument." 
       exit 1
@@ -48,14 +54,18 @@ while getopts ":t:a:d:b:m" opt; do
 done
 
 if [ -z ${TARGET_SOC} ]  || [ -z ${TARGET_ARCH} ] ||  [ -z ${BUILD_DEMO_NAME} ]; then
-  echo "$0 -t <target> -a <arch> -d <build_demo_name> [-b <build_type>] [-m]"
+  echo "$0 -t <target> -a <arch> -d <build_demo_name> [-b <build_type>] [-m] [-r] [-j]"
   echo ""
   echo "    -t : target (rk356x/rk3588/rk3576)"
   echo "    -a : arch (arm64-v8a/armeabi-v7a)"
   echo "    -d : demo name"
   echo "    -b : build_type (Debug/Release)"
   echo "    -m : enable address sanitizer, build_type need set to Debug"
+  echo "    -r : disable rga, use cpu resize image"
+  echo "    -j : disable libjpeg to avoid conflicts between libjpeg and opencv"
   echo "such as: $0  -t rk3588 -a arm64-v8a -d yolov5"
+  echo "Note: 'rk356x' represents rk3562/rk3566/rk3568"
+  echo "Note: 'if you want to use opencv to read or save jpg files, use the '-j' option to disable libjpeg"
   echo ""
   exit -1
 fi
@@ -68,6 +78,14 @@ fi
 # Build with Address Sanitizer for memory check, BUILD_TYPE need set to Debug
 if [[ -z ${ENABLE_ASAN} ]];then
     ENABLE_ASAN=OFF
+fi
+
+if [[ -z ${DISABLE_RGA} ]];then
+    DISABLE_RGA=OFF
+fi
+
+if [[ -z ${DISABLE_LIBJPEG} ]];then
+    DISABLE_LIBJPEG=OFF
 fi
 
 for demo_path in `find examples -name "${BUILD_DEMO_NAME}"`
@@ -137,6 +155,8 @@ echo "TARGET_SOC=${TARGET_SOC}"
 echo "TARGET_ARCH=${TARGET_ARCH}"
 echo "BUILD_TYPE=${BUILD_TYPE}"
 echo "ENABLE_ASAN=${ENABLE_ASAN}"
+echo "DISABLE_RGA=${DISABLE_RGA}"
+echo "DISABLE_LIBJPEG=${DISABLE_LIBJPEG}"
 echo "INSTALL_DIR=${INSTALL_DIR}"
 echo "BUILD_DIR=${BUILD_DIR}"
 echo "ANDROID_NDK_PATH=${ANDROID_NDK_PATH}"
@@ -160,6 +180,8 @@ cmake ../../${BUILD_DEMO_PATH} \
         -DCMAKE_ANDROID_NDK=${ANDROID_NDK_PATH} \
         -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
         -DENABLE_ASAN=${ENABLE_ASAN} \
+        -DDISABLE_RGA=${DISABLE_RGA} \
+        -DDISABLE_LIBJPEG=${DISABLE_LIBJPEG} \
         -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR}
 # make VERBOSE=1
 make -j4

@@ -50,13 +50,6 @@ int main(int argc, char **argv)
     memset(&result, 0, sizeof(ResultEntry));
     memset(label, 0, sizeof(label));
 
-    ret = init_yamnet_model(model_path, &rknn_app_ctx);
-    if (ret != 0)
-    {
-        printf("init_yamnet_model fail! ret=%d model_path=%s\n", ret, model_path);
-        goto out;
-    }
-
     // set data
     ret = read_label(label);
     if (ret != 0)
@@ -69,6 +62,33 @@ int main(int argc, char **argv)
     if (ret != 0)
     {
         printf("read audio fail! ret=%d audio_path=%s\n", ret, audio_path);
+        goto out;
+    }
+
+    if (audio.num_channels == 2)
+    {
+        ret = convert_channels(&audio);
+        if (ret != 0)
+        {
+            printf("convert channels fail! ret=%d\n", ret, audio_path);
+            goto out;
+        }
+    }
+
+    if (audio.sample_rate != SAMPLE_RATE)
+    {
+        ret = resample_audio(&audio, audio.sample_rate, SAMPLE_RATE);
+        if (ret != 0)
+        {
+            printf("resample audio fail! ret=%d\n", ret, audio_path);
+            goto out;
+        }
+    }
+
+    ret = init_yamnet_model(model_path, &rknn_app_ctx);
+    if (ret != 0)
+    {
+        printf("init_yamnet_model fail! ret=%d model_path=%s\n", ret, model_path);
         goto out;
     }
 
@@ -85,9 +105,8 @@ int main(int argc, char **argv)
     // print result
     printf("\nThe main sound is: %s\n", result[0].token);
 
-    infer_time = timer.get_time() / 1000.0;               // sec
-    audio_length = audio.num_frames / (float)SAMPLE_RATE; // sec
-    audio_length = audio_length > (float)CHUNK_LENGTH ? (float)CHUNK_LENGTH : audio_length;
+    infer_time = timer.get_time() / 1000.0; // sec
+    audio_length = (float)CHUNK_LENGTH;     // sec
     rtf = infer_time / audio_length;
     printf("Real Time Factor (RTF): %.3f / %.3f = %.3f\n", infer_time, audio_length, rtf);
 

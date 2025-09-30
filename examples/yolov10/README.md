@@ -31,8 +31,7 @@ https://github.com/THU-MIG/yolov10
 
 ## 2. Current Support Platform
 
-RK3566, RK3568, RK3588, RK3562, RK3576, RK1808, RV1109, RV1126
-
+RK3562, RK3566, RK3568, RK3576, RK3588, RV1126B, RV1109, RV1126, RK1808, RK3399PRO
 
 
 ## 3. Pretrained Model
@@ -68,6 +67,13 @@ python convert.py ../model/yolov10n.onnx rk3588
 - `<dtype>(optional)`: Specify as `i8`, `u8` or `fp`. `i8`/`u8` for doing quantization, `fp` for no quantization. Default is `i8`.
 - `<output_rknn_path>(optional)`: Specify save path for the RKNN model, default save in the same directory as ONNX model with name `yolov10.rknn`
 
+*Note:*
+
+Regarding the deployment of RKNN and the export of ONNX models， please refer:
+
+[RKNN_README_CN.md](https://github.com/airockchip/yolov10/blob/master/RKNN_README_CN.md)
+
+[RKNN_README_EN.md](https://github.com/airockchip/yolov10/blob/master/RKNN_README_EN.md)
 
 
 ## 5. Python Demo

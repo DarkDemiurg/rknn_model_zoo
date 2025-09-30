@@ -28,8 +28,7 @@ https://github.com/PaddlePaddle/PaddleSeg/tree/release/2.8
 
 ## 2. Current Support Platform
 
-RK3566, RK3568, RK3588, RK3562, RK3576, RV1109, RV1126, RK1808, RK3399PRO
-
+RK3562, RK3566, RK3568, RK3576, RK3588, RV1126B, RV1109, RV1126, RK1808, RK3399PRO
 
 
 ## 3. Pretrained Model
@@ -115,7 +114,7 @@ adb shell
 cd /data/rknn_ppseg_demo
 
 export LD_LIBRARY_PATH=./lib
-./rknn_ppseg_demo model/pp_liteseg_cityscapes.rknn model/test.png
+./rknn_ppseg_demo model/pp_liteseg.rknn model/test.png
 ```
 
 - After running, the result was saved as `result.png`. To check the result on host PC, pull back result referring to the following command: 
@@ -175,7 +174,7 @@ adb shell
 cd /userdata/rknn_ppseg_demo
 
 export LD_LIBRARY_PATH=./lib
-./rknn_ppseg_demo model/pp_liteseg_cityscapes.rknn model/test.png
+./rknn_ppseg_demo model/pp_liteseg.rknn model/test.png
 ```
 
 - After running, the result was saved as `result.png`. To check the result on host PC, pull back result referring to the following command: 

@@ -30,9 +30,7 @@ https://github.com/sirius-ai/LPRNet_Pytorch/
 
 ## 2. Current Support Platform
 
-RK3562, RK3566, RK3568, RK3576, RK3588, RK1808, RV1109, RV1126
-
-
+RK3562, RK3566, RK3568, RK3576, RK3588, RV1103, RV1106, RV1126B, RV1109, RV1126, RK1808, RK3399PRO
 
 ## 3. Pretrained Model
 
@@ -87,6 +85,7 @@ python lprnet.py --model_path <rknn_model> --target <TARGET_PLATFORM>
 ```
 车牌识别结果: 湘F6CL03
 ```
+- Note: If you encounter model running failure, please update the onnx version to 1.16.1 and try again after reconverting the rknn model.
 
 ## 6. Android Demo
 **Note: RK1808, RV1109, RV1126 does not support Android.**
@@ -150,6 +149,12 @@ export LD_LIBRARY_PATH=./lib
 ./rknn_lprnet_demo model/lprnet.rknn model/test.jpg
 ```
 
+- RV1106/1103 LD_LIBRARY_PATH must specify as the absolute path. Such as 
+
+  ```sh
+  export LD_LIBRARY_PATH=/userdata/rknn_LPRNet_demo/lib
+  ```
+
 ## 8. Expected Results
 
 
@@ -158,3 +163,4 @@ This example will print the recognition result of license plate, as follows:
 车牌识别结果: 湘F6CL03
 ```
 - Note: Different platforms, different versions of tools and drivers may have slightly different results.
+- Note: If you encounter model running failure, please update the onnx version to 1.16.1 and try again after reconverting the rknn model.

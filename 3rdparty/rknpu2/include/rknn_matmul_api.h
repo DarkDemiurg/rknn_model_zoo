@@ -58,6 +58,8 @@ typedef enum _rknn_matmul_type
   RKNN_INT8_MM_INT8_TO_FLOAT32       = 9,
   RKNN_INT4_MM_INT4_TO_INT16         = 10,
   RKNN_INT8_MM_INT4_TO_INT32         = 11,
+  RKNN_FLOAT16_MM_INT4_TO_BFLOAT16   = 12,
+  RKNN_INT8_MM_INT4_TO_FLOAT16       = 15,
 } rknn_matmul_type;
 
 inline static const char* get_matmul_type_string(rknn_matmul_type type)
@@ -85,6 +87,8 @@ inline static const char* get_matmul_type_string(rknn_matmul_type type)
     return "RKNN_INT8_MM_INT4_TO_INT32";
   case RKNN_INT8_MM_INT8_TO_FLOAT32:
     return "RKNN_INT8_MM_INT8_TO_FLOAT32";
+  case RKNN_FLOAT16_MM_INT4_TO_BFLOAT16:
+    return "RKNN_FLOAT16_MM_INT4_TO_BFLOAT16";
   default:
     return "UNKNOW";
   }
@@ -197,7 +201,7 @@ typedef struct rknn_matmul_info_t
 */
 int rknn_matmul_create(rknn_matmul_ctx* ctx, rknn_matmul_info* info, rknn_matmul_io_attr* io_attr);
 
-/*  rknn_matmul_create_dyn_shape
+/*  rknn_matmul_create_dynamic_shape
 
     params:
         rknn_matmul_ctx *ctx                the handle of context.
@@ -211,7 +215,7 @@ int rknn_matmul_create(rknn_matmul_ctx* ctx, rknn_matmul_info* info, rknn_matmul
 /*
   原来的info.M, K, N无效
 */
-int rknn_matmul_create_dyn_shape(rknn_matmul_ctx* ctx, rknn_matmul_info* info, int shape_num,
+int rknn_matmul_create_dynamic_shape(rknn_matmul_ctx* ctx, rknn_matmul_info* info, int shape_num,
                                  rknn_matmul_shape dynamic_shapes[], rknn_matmul_io_attr io_attrs[]);
 
 /* rknn_matmul_set_io_mem

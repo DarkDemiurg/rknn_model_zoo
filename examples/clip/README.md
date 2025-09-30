@@ -30,8 +30,7 @@ https://huggingface.co/openai/clip-vit-base-patch32
 
 ## 2. Current Support Platform
 
-RK3566, RK3568, RK3588, RK3562, RK3576
-
+RK3562, RK3566, RK3568, RK3576, RK3588, RV1126B
 
 
 ## 3. Pretrained Model
@@ -69,6 +68,9 @@ python convert.py ../model/clip_images.onnx rk3588
 - `<TARGET_PLATFORM>`: Specify NPU platform name. Support Platform refer [here](#2-current-support-platform).
 - `<output_rknn_path>(optional)`: Specify save path for the RKNN model, default save in the same directory as ONNX model with name `clip_images.rknn`
 
+*Note:*
+
+For export clip onnx model, please refer to [export_onnx.md](./export_onnx.md)
 
 
 ## 5. Python Demo
