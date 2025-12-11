@@ -119,24 +119,59 @@ int main(int argc, char **argv)
     if (isdigit(*source))
     {
         int cam = static_cast<int>(strtol(source, nullptr, 10));
-        cout << "Before open camera: " << cam << endl;
-        vid.open(cam);
-        vid.set(CAP_PROP_FRAME_WIDTH, SRC_WIDTH);
-        vid.set(CAP_PROP_FRAME_HEIGHT, SRC_HEIGHT);
-        vid.set(CAP_PROP_FPS, FPS);
-        cout << "After open camera" << endl;
+
+        stringstream pipeline_builder;
+        pipeline_builder << "v4l2src device=/dev/video" << cam
+                 << " ! image/jpeg, width=" << SRC_WIDTH
+                 << ", height=" << SRC_HEIGHT
+                 << ", framerate=" << FPS << "/1"
+                 << " ! jpegdec ! videoconvert"
+                 << " ! video/x-raw, format=BGR"
+                 << " ! appsink drop=true sync=false";
+        string pipeline = pipeline_builder.str();
+
+        cout << "Try open USB camera <" << cam << "> with custom GStreamer pipeline:\n\t" << pipeline << endl;
+
+        vid.open(pipeline, CAP_GSTREAMER);
+
+        if (!vid.isOpened())
+        {
+            cout << "Can't open USB camera! Try open CSI camera <" << cam << ">" << endl;
+            vid.open(cam);
+
+            if (vid.isOpened())
+            {
+                vid.set(CAP_PROP_FRAME_WIDTH, SRC_WIDTH);
+                vid.set(CAP_PROP_FRAME_HEIGHT, SRC_HEIGHT);
+                vid.set(CAP_PROP_FPS, FPS);
+                cout << "CSI camera opened.";
+            }
+            else
+            {
+                cout << "Can't open CSI camera!" << endl;
+                return 1;
+            }
+        }
+        else
+        {
+            cout << "USB camera opened.";
+        }
     }
     else
     {
         cout << "Before open video: " << source << endl;
         vid.open(source);
         cout << "After open video" << endl;
-    }
 
-    if (!vid.isOpened())
-    {
-        cerr << "ERROR: Could not open camera" << endl;
-        return 1;
+        if (!vid.isOpened())
+        {
+            cerr << "ERROR: Could not open video" << endl;
+            return 1;
+        }
+        else
+        {
+            cout << "Video opened.";
+        }
     }
 
     Mat m;
