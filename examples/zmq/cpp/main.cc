@@ -5,6 +5,9 @@
 #include <zmq.hpp>
 #include <opencv2/opencv.hpp>
 
+#include <chrono>
+#include <iomanip>
+
 #include "yolov5.h"
 #include "image_utils.h"
 #include "file_utils.h"
@@ -223,14 +226,12 @@ int main(int argc, char **argv)
     sock.set(zmq::sockopt::sndbuf, WIDTH * HEIGHT * 8 * 3 * 2);
     sock.bind("tcp://127.0.0.1:5757");
 
-    static clock_t start, end;
-    static double t = 0;
-    static int f = 0;
-    static int cnt = 0;
+    double total_processing_time = 0;
+    int frame_counter = 0;
 
     while (true)
     {
-        start = clock();
+	auto start = std::chrono::steady_clock::now();
 
         vid >> m;
         if (m.empty())
@@ -288,16 +289,20 @@ int main(int argc, char **argv)
         sock.send(zmq::buffer(msg), zmq::send_flags::sndmore);
         sock.send(zmq::buffer(dst_image.virt_addr, dst_image.size), zmq::send_flags::none);
 
-        end = clock();
-        double cpu_time_used = ((double)(end - start)) / CLOCKS_PER_SEC;
-        t += cpu_time_used;
-        f += 1;
+	auto end = std::chrono::steady_clock::now();
+	std::chrono::duration<double> diff = end - start;
 
-        if (f % 30 == 0)
+	total_processing_time += diff.count();
+	frame_counter++;
+
+        if (frame_counter % 30 == 0)
         {
-            cout << "\t FPS: " << std::fixed << std::setw(11) << std::setprecision(6) << 30.0 / t << " time = " << t << endl;
-            t = 0;
-            f = 0;
+	    double avg_fps = frame_counter / total_processing_time;
+
+	    cout << "\t FPS: " << std::fixed << std::setw(11) << std::setprecision(6) << avg_fps << " time: " << total_processing_time << std::endl;
+
+	    total_processing_time = 0;
+	    frame_counter = 0;
         }
     }
 
