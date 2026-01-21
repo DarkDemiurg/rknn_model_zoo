@@ -1,6 +1,8 @@
 #include <cctype>
 #include <ctime>
 #include <iostream>
+#include <cstdlib>
+#include <getopt.h>
 #include <string>
 #include <zmq.hpp>
 #include <opencv2/opencv.hpp>
@@ -16,9 +18,15 @@
 using namespace cv;
 using namespace std;
 
-#define SRC_WIDTH 960
-#define SRC_HEIGHT 720
-#define FPS 30
+#define DEFAULT_WIDTH 960
+#define DEFAULT_HEIGHT 720
+//#define FPS 30
+
+struct Resolution 
+{
+    int width;
+    int height;
+};
 
 #define WIDTH 640
 #define HEIGHT 640
@@ -106,16 +114,59 @@ bool mat_to_image_buffer(const cv::Mat &mat, image_buffer_t &out_buf, image_form
     return true;
 }
 
+void print_usage(const char* program_name)
+{
+    cout << "Usage: " << program_name << " <model_path> <source> [-w WIDTH] [-h HEIGHT]" << endl;
+}
+
+Resolution parseArguments(int argc, char* argv[])
+{
+    Resolution res = {DEFAULT_WIDTH, DEFAULT_HEIGHT};
+    int opt;
+
+    while ((opt = getopt(argc, argv, "w:h:")) != -1) 
+    {
+        switch (opt) 
+        {
+            case 'w':
+                res.width = atoi(optarg);
+                if (res.width <= 0) 
+                {
+                    cerr << "Warning: WIDTH must be greater than 0. Use default value." << endl;
+                    res.width = DEFAULT_WIDTH;
+                }
+                break;
+            case 'h':
+                res.height = atoi(optarg);
+                if (res.height <= 0) 
+                {
+                    cerr << "Warning: HEIGHT must be greater than 0. Use default value." << endl;
+                    res.height = DEFAULT_HEIGHT;
+                }
+                break;
+            case '?':
+                print_usage(argv[0]);
+                break;
+        }
+    }
+
+    return res;
+}
+
+
 int main(int argc, char **argv)
 {
-    if (argc != 3)
+    if (argc < 3)
     {
-        cout << argv[0] << " <model_path> <source>" << endl;
+        print_usage(argv[0]);
         return -1;
     }
 
     const char *model_path = argv[1];
     const char *source = argv[2];
+
+    Resolution resolution = parseArguments(argc, argv);
+    cout << "Camera resolution: [" << resolution.width << "x" << resolution.height << "]" << endl;
 
     VideoCapture vid;
 
@@ -125,9 +176,9 @@ int main(int argc, char **argv)
 
         stringstream pipeline_builder;
         pipeline_builder << "v4l2src device=/dev/video" << cam
-                 << " ! image/jpeg, width=" << SRC_WIDTH
-                 << ", height=" << SRC_HEIGHT
-                 << ", framerate=" << FPS << "/1"
+                 << " ! image/jpeg, width=" << resolution.width
+                 << ", height=" << resolution.height
+//                 << ", framerate=" << FPS << "/1"
                  << " ! jpegdec ! videoconvert"
                  << " ! video/x-raw, format=BGR"
                  << " ! appsink drop=true sync=false";
@@ -144,9 +195,9 @@ int main(int argc, char **argv)
 
             if (vid.isOpened())
             {
-                vid.set(CAP_PROP_FRAME_WIDTH, SRC_WIDTH);
-                vid.set(CAP_PROP_FRAME_HEIGHT, SRC_HEIGHT);
-                vid.set(CAP_PROP_FPS, FPS);
+                vid.set(CAP_PROP_FRAME_WIDTH, resolution.width);
+                vid.set(CAP_PROP_FRAME_HEIGHT, resolution.height);
+//                vid.set(CAP_PROP_FPS, FPS);
                 cout << "CSI camera opened.";
             }
             else
