@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(zmq_opi)
+project(zmq_opi_yolo5)
 
 #link_directories(/usr/lib/aarch64-linux-gnu/)
 #set (cppzmq_DIR /home/radxa/vcpkg/installed/arm64-linux/share/cppzmq/ )
