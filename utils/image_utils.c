@@ -157,7 +157,7 @@ static int write_image_jpeg(const char* path, int quality, const image_buffer_t*
 
 	// printf("ret=%d jpegBuf=%p jpegSize=%d\n", ret, jpegBuf, jpegSize);
     if (jpegBuf != NULL && jpegSize > 0) {
-        write_data_to_file(path, (const char*)jpegBuf, jpegSize);
+//        write_data_to_file(path, (const char*)jpegBuf, jpegSize); // TODO: uncomment
         tjFree(jpegBuf);
     }
     tjDestroy(handle);
@@ -288,7 +288,7 @@ int write_image(const char* path, const image_buffer_t* img)
 #endif
     } else if (strcmp(_ext, ".data") == 0 | strcmp(_ext, ".DATA") == 0) {
         int size = get_image_size(img);
-        ret = write_data_to_file(path, data, size);
+ //       ret = write_data_to_file(path, data, size); // TODO: uncomment
     } else {
         // unknown extension type
         return -1;
