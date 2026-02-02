@@ -10,6 +10,12 @@ static unsigned char *load_data(FILE *fp, size_t ofst, size_t sz);
 static unsigned char *load_model(const char *filename, int *model_size);
 static int saveFloat(const char *file_name, float *output, int element_size);
 
+struct Res
+{
+    cv::Mat img;
+    std::string msg;
+};
+
 class rkYolov5s
 {
 private:
@@ -33,7 +39,7 @@ public:
     rkYolov5s(const std::string &model_path);
     int init(rknn_context *ctx_in, bool isChild);
     rknn_context *get_pctx();
-    cv::Mat infer(cv::Mat &ori_img);
+    Res infer(Res &ori_img);
     ~rkYolov5s();
 };
 

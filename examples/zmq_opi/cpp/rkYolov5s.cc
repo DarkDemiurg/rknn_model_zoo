@@ -131,7 +131,7 @@ int rkYolov5s::init(rknn_context *ctx_in, bool share_weight)
             core_mask = RKNN_NPU_CORE_2;
             break;
     }
-    
+
     ret = rknn_set_core_mask(ctx, core_mask);
     if (ret < 0)
     {
@@ -211,11 +211,11 @@ rknn_context *rkYolov5s::get_pctx()
     return &ctx;
 }
 
-cv::Mat rkYolov5s::infer(cv::Mat &orig_img)
+Res rkYolov5s::infer(Res &orig_img)
 {
     std::lock_guard<std::mutex> lock(mtx);
     cv::Mat img;
-    cv::cvtColor(orig_img, img, cv::COLOR_BGR2RGB);
+    cv::cvtColor(orig_img.img, img, cv::COLOR_BGR2RGB);
     img_width = img.cols;
     img_height = img.rows;
 
@@ -275,7 +275,7 @@ std::string msg;
         int y1 = det_result->box.top;
         int x2 = det_result->box.right;
         int y2 = det_result->box.bottom;
-        cv::rectangle(orig_img, cv::Point(x1, y1), cv::Point(x2, y2),cv::Scalar(255, 0, 0));
+        cv::rectangle(orig_img.img, cv::Point(x1, y1), cv::Point(x2, y2),cv::Scalar(255, 0, 0));
 
         //printf("%s @ (%d %d %d %d) %f\n", det_result->name, det_result->box.left, det_result->box.top, det_result->box.right, det_result->box.bottom, det_result->prop);
 
@@ -291,11 +291,11 @@ msg += text;
         int x = det_result->box.left;
         int y = det_result->box.top - label_size.height - baseLine;
         if (y < 0) y = 0;
-        if (x + label_size.width > orig_img.cols) x = orig_img.cols - label_size.width;
+        if (x + label_size.width > orig_img.img.cols) x = orig_img.img.cols - label_size.width;
 
-        cv::rectangle(orig_img, cv::Rect(cv::Point(x, y), cv::Size(label_size.width, label_size.height + baseLine)), cv::Scalar(255, 255, 255), -1);
+        cv::rectangle(orig_img.img, cv::Rect(cv::Point(x, y), cv::Size(label_size.width, label_size.height + baseLine)), cv::Scalar(255, 255, 255), -1);
 
-        cv::putText(orig_img, text, cv::Point(x, y + label_size.height), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
+        cv::putText(orig_img.img, text, cv::Point(x, y + label_size.height), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
 
 //        sprintf(text, "%s %.1f%%", det_result->name, det_result->prop * 100);
 //        // Prints information about the predicted object
@@ -305,15 +305,19 @@ msg += text;
 //        int y1 = det_result->box.top;
 //        int x2 = det_result->box.right;
 //        int y2 = det_result->box.bottom;
-//        rectangle(orig_img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(256, 0, 0, 256), 3);
-//        putText(orig_img, text, cv::Point(x1, y1 + 12), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255));
+//        rectangle(orig_img.img, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(256, 0, 0, 256), 3);
+//        putText(orig_img.img, text, cv::Point(x1, y1 + 12), cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(255, 255, 255));
     }
 
 //    printf(msg.c_str());
 
     ret = rknn_outputs_release(ctx, io_num.n_output, outputs);
 
-    return orig_img;
+    Res r;
+    r.img = orig_img.img;
+    r.msg = msg;
+
+    return r;
 }
 
 rkYolov5s::~rkYolov5s()

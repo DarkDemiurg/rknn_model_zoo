@@ -155,7 +155,6 @@ Resolution parseArguments(int argc, char* argv[])
     return res;
 }
 
-
 int main(int argc, char **argv)
 {
     if (argc < 3)
@@ -174,7 +173,7 @@ int main(int argc, char **argv)
   
     int threadNum = 3;
 
-    rknnPool<rkYolov5s, cv::Mat, cv::Mat> testPool(model_path, threadNum);
+    rknnPool<rkYolov5s, Res, Res> testPool(model_path, threadNum);
 
     if (testPool.init() != 0)
     {
@@ -249,7 +248,8 @@ int main(int argc, char **argv)
         }
     }
 
-    Mat m, img;
+    Mat m;
+    Res result;
     vid >> m;
     if (m.empty())
     {
@@ -273,31 +273,34 @@ int main(int argc, char **argv)
         }
 
         string msg;
+        Res src;
+        src.img = m;        
 
-        if (testPool.put(m) != 0)
+        if (testPool.put(src) != 0)
         {
             cerr << "Can't put to pool" << endl;
             break;
         }
 
-        if (frames >= threadNum && testPool.get(img) != 0)
+        if (frames >= threadNum && testPool.get(result) != 0)
         {
             cerr << "Can't get from pool" << endl;
             break;
         }
-/*
-        if (!img.empty())
+
+#ifdef DEBUG
+        if (!result.img.empty())
         {
             std::ostringstream filename;
             filename << "img_" << frames << ".png";
-            cv::imwrite(filename.str(), img);
+            cv::imwrite(filename.str(), result.img);
         }
-*/
+#endif
         if (msg.length() == 0)
             msg = "empty";
 
-//        sock.send(zmq::buffer(msg), zmq::send_flags::sndmore);
-//        sock.send(zmq::buffer(dst_image.virt_addr, dst_image.size), zmq::send_flags::none); // TODO: convert 
+        sock.send(zmq::buffer(result.msg), zmq::send_flags::sndmore);
+        sock.send(zmq::buffer(result.img.data, result.img.step[0] * result.img.rows), zmq::send_flags::none); // TODO: convert 
 
         auto end = std::chrono::steady_clock::now();
         std::chrono::duration<double> diff = end - start;
@@ -319,8 +322,8 @@ int main(int argc, char **argv)
 
     while (true)
     {
-        cv::Mat img;
-        if (testPool.get(img) != 0)
+        Res result;
+        if (testPool.get(result) != 0)
             break;
     }
 
