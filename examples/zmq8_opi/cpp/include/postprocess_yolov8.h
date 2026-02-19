@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include "rknn_api.h"
 
 #define OBJ_NAME_MAX_SIZE 16
 #define OBJ_NUMB_MAX_SIZE 64

@@ -1,5 +1,4 @@
 #include "postprocess_yolov8.h"
-#include "rknn_api.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -216,6 +215,8 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
     
     memset(group, 0, sizeof(detect_result_group_t));
     
+    printf("DEBUG: num_outputs=%d, conf_threshold=%.3f\n", num_outputs, conf_threshold);
+    
     const int num_classes = OBJ_CLASS_NUM;
     std::vector<float> boxes;
     std::vector<float> scores;
@@ -228,15 +229,34 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
         float scale = output_attrs[out_idx].scale;
         
         // Determine output dimensions
+        int n_dims = output_attrs[out_idx].n_dims;
+        printf("DEBUG: output[%d] n_dims=%d dims=[", out_idx, n_dims);
+        for (int i = 0; i < n_dims; i++) {
+            printf("%d%s", output_attrs[out_idx].dims[i], i < n_dims-1 ? "," : "");
+        }
+        printf("] zp=%d scale=%.6f\n", zp, scale);
+        
+        if (n_dims != 4) {
+            printf("DEBUG: Skipping output %d - expected 4 dims\n", out_idx);
+            continue;
+        }
+        
         int height = output_attrs[out_idx].dims[1];
         int width = output_attrs[out_idx].dims[2];
         int channels = output_attrs[out_idx].dims[3];
         
         int num_boxes = height * width;
         
-        // YOLOv8 format: first 4 channels are bbox, rest are class scores
-        if (channels < 4 + num_classes) continue;
+        printf("DEBUG: output[%d] h=%d w=%d ch=%d boxes=%d\n", out_idx, height, width, channels, num_boxes);
         
+        // YOLOv8 format: first 4 channels are bbox, rest are class scores
+        if (channels < 4 + num_classes) {
+            printf("DEBUG: Skipping output %d - not enough channels (need %d, got %d)\n", 
+                   out_idx, 4 + num_classes, channels);
+            continue;
+        }
+        
+        int detections_found = 0;
         for (int i = 0; i < num_boxes; i++) {
             // Find max class score
             float max_score = -1.0f;
@@ -253,11 +273,18 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
             
             if (max_score < conf_threshold) continue;
             
+            detections_found++;
+            
             // Get bbox (x_center, y_center, w, h)
             float x = deqnt_affine_to_f32(output[i], zp, scale);
             float y = deqnt_affine_to_f32(output[i + num_boxes], zp, scale);
             float w = deqnt_affine_to_f32(output[i + 2 * num_boxes], zp, scale);
             float h = deqnt_affine_to_f32(output[i + 3 * num_boxes], zp, scale);
+            
+            if (detections_found <= 3) {
+                printf("DEBUG: Detection %d: x=%.2f y=%.2f w=%.2f h=%.2f score=%.3f class=%d\n",
+                       detections_found, x, y, w, h, max_score, max_class_id);
+            }
             
             boxes.push_back(x - w / 2);
             boxes.push_back(y - h / 2);
@@ -266,7 +293,11 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
             scores.push_back(max_score);
             class_ids.push_back(max_class_id);
         }
+        
+        printf("DEBUG: output[%d] found %d detections above threshold\n", out_idx, detections_found);
     }
+    
+    printf("DEBUG: Total detections before NMS: %zu\n", boxes.size() / 4);
     
     if (boxes.empty()) {
         group->count = 0;
@@ -315,5 +346,6 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
     }
     
     group->count = count;
+    printf("DEBUG: Final detections after NMS: %d\n", count);
     return 0;
 }
