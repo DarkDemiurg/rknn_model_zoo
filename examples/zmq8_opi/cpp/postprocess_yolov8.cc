@@ -1,4 +1,5 @@
 #include "postprocess_yolov8.h"
+#include "rknn_api.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -195,4 +196,124 @@ void deinitPostProcess()
             labels[i] = nullptr;
         }
     }
+}
+
+// For YOLOv8 with multiple outputs (split heads)
+int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
+                               rknn_tensor_attr *output_attrs,
+                               int model_in_h, int model_in_w,
+                               float conf_threshold, float nms_threshold,
+                               float scale_w, float scale_h,
+                               detect_result_group_t *group)
+{
+    static int init = -1;
+    if (init == -1) {
+        if (loadLabelName(LABEL_NALE_TXT_PATH, labels) < 0) {
+            return -1;
+        }
+        init = 0;
+    }
+    
+    memset(group, 0, sizeof(detect_result_group_t));
+    
+    const int num_classes = OBJ_CLASS_NUM;
+    std::vector<float> boxes;
+    std::vector<float> scores;
+    std::vector<int> class_ids;
+    
+    // Process each output head
+    for (int out_idx = 0; out_idx < num_outputs; out_idx++) {
+        int8_t *output = inputs[out_idx];
+        int32_t zp = output_attrs[out_idx].zp;
+        float scale = output_attrs[out_idx].scale;
+        
+        // Determine output dimensions
+        int height = output_attrs[out_idx].dims[1];
+        int width = output_attrs[out_idx].dims[2];
+        int channels = output_attrs[out_idx].dims[3];
+        
+        int num_boxes = height * width;
+        
+        // YOLOv8 format: first 4 channels are bbox, rest are class scores
+        if (channels < 4 + num_classes) continue;
+        
+        for (int i = 0; i < num_boxes; i++) {
+            // Find max class score
+            float max_score = -1.0f;
+            int max_class_id = -1;
+            
+            for (int c = 0; c < num_classes; c++) {
+                int idx = i + (4 + c) * num_boxes;
+                float score = deqnt_affine_to_f32(output[idx], zp, scale);
+                if (score > max_score) {
+                    max_score = score;
+                    max_class_id = c;
+                }
+            }
+            
+            if (max_score < conf_threshold) continue;
+            
+            // Get bbox (x_center, y_center, w, h)
+            float x = deqnt_affine_to_f32(output[i], zp, scale);
+            float y = deqnt_affine_to_f32(output[i + num_boxes], zp, scale);
+            float w = deqnt_affine_to_f32(output[i + 2 * num_boxes], zp, scale);
+            float h = deqnt_affine_to_f32(output[i + 3 * num_boxes], zp, scale);
+            
+            boxes.push_back(x - w / 2);
+            boxes.push_back(y - h / 2);
+            boxes.push_back(x + w / 2);
+            boxes.push_back(y + h / 2);
+            scores.push_back(max_score);
+            class_ids.push_back(max_class_id);
+        }
+    }
+    
+    if (boxes.empty()) {
+        group->count = 0;
+        return 0;
+    }
+    
+    // NMS
+    std::vector<int> indices(scores.size());
+    for (size_t i = 0; i < indices.size(); i++) indices[i] = i;
+    
+    std::sort(indices.begin(), indices.end(), [&scores](int a, int b) {
+        return scores[a] > scores[b];
+    });
+    
+    std::vector<bool> keep(scores.size(), true);
+    for (size_t i = 0; i < indices.size(); i++) {
+        if (!keep[indices[i]]) continue;
+        
+        for (size_t j = i + 1; j < indices.size(); j++) {
+            if (!keep[indices[j]]) continue;
+            if (class_ids[indices[i]] != class_ids[indices[j]]) continue;
+            
+            float iou = CalculateOverlap(
+                boxes[indices[i] * 4], boxes[indices[i] * 4 + 1],
+                boxes[indices[i] * 4 + 2], boxes[indices[i] * 4 + 3],
+                boxes[indices[j] * 4], boxes[indices[j] * 4 + 1],
+                boxes[indices[j] * 4 + 2], boxes[indices[j] * 4 + 3]
+            );
+            
+            if (iou > nms_threshold) keep[indices[j]] = false;
+        }
+    }
+    
+    // Fill results
+    int count = 0;
+    for (size_t i = 0; i < keep.size() && count < OBJ_NUMB_MAX_SIZE; i++) {
+        if (!keep[i]) continue;
+        
+        group->results[count].box.left = (int)(clamp(boxes[i * 4] / scale_w, 0, model_in_w));
+        group->results[count].box.top = (int)(clamp(boxes[i * 4 + 1] / scale_h, 0, model_in_h));
+        group->results[count].box.right = (int)(clamp(boxes[i * 4 + 2] / scale_w, 0, model_in_w));
+        group->results[count].box.bottom = (int)(clamp(boxes[i * 4 + 3] / scale_h, 0, model_in_h));
+        group->results[count].prop = scores[i];
+        strncpy(group->results[count].name, labels[class_ids[i]], OBJ_NAME_MAX_SIZE);
+        count++;
+    }
+    
+    group->count = count;
+    return 0;
 }

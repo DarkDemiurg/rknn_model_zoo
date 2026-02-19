@@ -38,5 +38,12 @@ int post_process_yolov8(int8_t *input, int model_in_h, int model_in_w,
                         int32_t qnt_zp, float qnt_scale,
                         detect_result_group_t *group);
 
+int post_process_yolov8_multi(int8_t **inputs, int num_outputs, 
+                               rknn_tensor_attr *output_attrs,
+                               int model_in_h, int model_in_w,
+                               float conf_threshold, float nms_threshold,
+                               float scale_w, float scale_h,
+                               detect_result_group_t *group);
+
 void deinitPostProcess();
 #endif

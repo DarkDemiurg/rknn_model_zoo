@@ -177,11 +177,20 @@ Res rkYolov8::infer(Res &orig_img)
     ret = rknn_outputs_get(ctx, io_num.n_output, outputs, NULL);
 
     detect_result_group_t detect_result_group;
-    post_process_yolov8((int8_t *)outputs[0].buf, height, width,
-                        box_conf_threshold, nms_threshold,
-                        scale_w, scale_h,
-                        output_attrs[0].zp, output_attrs[0].scale,
-                        &detect_result_group);
+    
+    // Collect output pointers
+    int8_t **output_bufs = new int8_t*[io_num.n_output];
+    for (int i = 0; i < io_num.n_output; i++) {
+        output_bufs[i] = (int8_t *)outputs[i].buf;
+    }
+    
+    post_process_yolov8_multi(output_bufs, io_num.n_output, output_attrs,
+                              height, width,
+                              box_conf_threshold, nms_threshold,
+                              scale_w, scale_h,
+                              &detect_result_group);
+    
+    delete[] output_bufs;
 
     std::string msg;
     char text[256];
