@@ -215,86 +215,120 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
     
     memset(group, 0, sizeof(detect_result_group_t));
     
-    printf("DEBUG: num_outputs=%d, conf_threshold=%.3f\n", num_outputs, conf_threshold);
-    
     const int num_classes = OBJ_CLASS_NUM;
     std::vector<float> boxes;
     std::vector<float> scores;
     std::vector<int> class_ids;
     
-    // Process each output head
-    for (int out_idx = 0; out_idx < num_outputs; out_idx++) {
-        int8_t *output = inputs[out_idx];
-        int32_t zp = output_attrs[out_idx].zp;
-        float scale = output_attrs[out_idx].scale;
+    // YOLOv8 split outputs: bbox (64ch), classes (80ch), objectness (1ch) for each scale
+    // Process 3 scales: 80x80, 40x40, 20x20
+    for (int scale_idx = 0; scale_idx < 3; scale_idx++) {
+        int bbox_idx = scale_idx * 3;      // 0, 3, 6
+        int class_idx = scale_idx * 3 + 1; // 1, 4, 7
+        int obj_idx = scale_idx * 3 + 2;   // 2, 5, 8
         
-        // Determine output dimensions
-        int n_dims = output_attrs[out_idx].n_dims;
-        printf("DEBUG: output[%d] n_dims=%d dims=[", out_idx, n_dims);
-        for (int i = 0; i < n_dims; i++) {
-            printf("%d%s", output_attrs[out_idx].dims[i], i < n_dims-1 ? "," : "");
-        }
-        printf("] zp=%d scale=%.6f\n", zp, scale);
+        if (bbox_idx >= num_outputs || class_idx >= num_outputs || obj_idx >= num_outputs) break;
         
-        if (n_dims != 4) {
-            printf("DEBUG: Skipping output %d - expected 4 dims\n", out_idx);
-            continue;
-        }
+        int8_t *bbox_output = inputs[bbox_idx];
+        int8_t *class_output = inputs[class_idx];
+        int8_t *obj_output = inputs[obj_idx];
         
-        int height = output_attrs[out_idx].dims[1];
-        int width = output_attrs[out_idx].dims[2];
-        int channels = output_attrs[out_idx].dims[3];
+        int32_t bbox_zp = output_attrs[bbox_idx].zp;
+        float bbox_scale = output_attrs[bbox_idx].scale;
+        int32_t class_zp = output_attrs[class_idx].zp;
+        float class_scale = output_attrs[class_idx].scale;
+        int32_t obj_zp = output_attrs[obj_idx].zp;
+        float obj_scale = output_attrs[obj_idx].scale;
         
-        int num_boxes = height * width;
+        int grid_h = output_attrs[class_idx].dims[2];
+        int grid_w = output_attrs[class_idx].dims[3];
+        int bbox_ch = output_attrs[bbox_idx].dims[1];
         
-        printf("DEBUG: output[%d] h=%d w=%d ch=%d boxes=%d\n", out_idx, height, width, channels, num_boxes);
+        printf("DEBUG: Scale %d - grid %dx%d, bbox_ch=%d\n", scale_idx, grid_h, grid_w, bbox_ch);
         
-        // YOLOv8 format: first 4 channels are bbox, rest are class scores
-        if (channels < 4 + num_classes) {
-            printf("DEBUG: Skipping output %d - not enough channels (need %d, got %d)\n", 
-                   out_idx, 4 + num_classes, channels);
-            continue;
-        }
-        
+        int stride = model_in_h / grid_h;
         int detections_found = 0;
-        for (int i = 0; i < num_boxes; i++) {
-            // Find max class score
-            float max_score = -1.0f;
-            int max_class_id = -1;
-            
-            for (int c = 0; c < num_classes; c++) {
-                int idx = i + (4 + c) * num_boxes;
-                float score = deqnt_affine_to_f32(output[idx], zp, scale);
-                if (score > max_score) {
-                    max_score = score;
-                    max_class_id = c;
+        
+        for (int h = 0; h < grid_h; h++) {
+            for (int w = 0; w < grid_w; w++) {
+                int grid_idx = h * grid_w + w;
+                
+                // Get objectness
+                float objectness = deqnt_affine_to_f32(obj_output[grid_idx], obj_zp, obj_scale);
+                
+                if (objectness < conf_threshold) continue;
+                
+                // Find max class score
+                float max_class_score = -1.0f;
+                int max_class_id = -1;
+                
+                for (int c = 0; c < num_classes; c++) {
+                    int class_offset = c * grid_h * grid_w + grid_idx;
+                    float score = deqnt_affine_to_f32(class_output[class_offset], class_zp, class_scale);
+                    if (score > max_class_score) {
+                        max_class_score = score;
+                        max_class_id = c;
+                    }
                 }
+                
+                float final_score = objectness * max_class_score;
+                if (final_score < conf_threshold) continue;
+                
+                detections_found++;
+                
+                // Decode bbox (DFL format: 64 channels = 4 directions × 16 bins)
+                float bbox[4] = {0};
+                int reg_max = bbox_ch / 4; // 16
+                
+                for (int k = 0; k < 4; k++) {
+                    float sum = 0;
+                    float max_val = -1e9;
+                    
+                    // Softmax over reg_max bins
+                    std::vector<float> vals(reg_max);
+                    for (int i = 0; i < reg_max; i++) {
+                        int offset = (k * reg_max + i) * grid_h * grid_w + grid_idx;
+                        vals[i] = deqnt_affine_to_f32(bbox_output[offset], bbox_zp, bbox_scale);
+                        if (vals[i] > max_val) max_val = vals[i];
+                    }
+                    
+                    float exp_sum = 0;
+                    for (int i = 0; i < reg_max; i++) {
+                        vals[i] = expf(vals[i] - max_val);
+                        exp_sum += vals[i];
+                    }
+                    
+                    for (int i = 0; i < reg_max; i++) {
+                        sum += (vals[i] / exp_sum) * i;
+                    }
+                    
+                    bbox[k] = sum;
+                }
+                
+                // Convert to x1,y1,x2,y2
+                float cx = (w + 0.5f) * stride;
+                float cy = (h + 0.5f) * stride;
+                
+                float x1 = cx - bbox[0] * stride;
+                float y1 = cy - bbox[1] * stride;
+                float x2 = cx + bbox[2] * stride;
+                float y2 = cy + bbox[3] * stride;
+                
+                if (detections_found <= 3) {
+                    printf("DEBUG: Det %d: grid(%d,%d) obj=%.3f cls=%.3f final=%.3f bbox=[%.1f,%.1f,%.1f,%.1f]\n",
+                           detections_found, w, h, objectness, max_class_score, final_score, x1, y1, x2, y2);
+                }
+                
+                boxes.push_back(x1);
+                boxes.push_back(y1);
+                boxes.push_back(x2);
+                boxes.push_back(y2);
+                scores.push_back(final_score);
+                class_ids.push_back(max_class_id);
             }
-            
-            if (max_score < conf_threshold) continue;
-            
-            detections_found++;
-            
-            // Get bbox (x_center, y_center, w, h)
-            float x = deqnt_affine_to_f32(output[i], zp, scale);
-            float y = deqnt_affine_to_f32(output[i + num_boxes], zp, scale);
-            float w = deqnt_affine_to_f32(output[i + 2 * num_boxes], zp, scale);
-            float h = deqnt_affine_to_f32(output[i + 3 * num_boxes], zp, scale);
-            
-            if (detections_found <= 3) {
-                printf("DEBUG: Detection %d: x=%.2f y=%.2f w=%.2f h=%.2f score=%.3f class=%d\n",
-                       detections_found, x, y, w, h, max_score, max_class_id);
-            }
-            
-            boxes.push_back(x - w / 2);
-            boxes.push_back(y - h / 2);
-            boxes.push_back(x + w / 2);
-            boxes.push_back(y + h / 2);
-            scores.push_back(max_score);
-            class_ids.push_back(max_class_id);
         }
         
-        printf("DEBUG: output[%d] found %d detections above threshold\n", out_idx, detections_found);
+        printf("DEBUG: Scale %d found %d detections\n", scale_idx, detections_found);
     }
     
     printf("DEBUG: Total detections before NMS: %zu\n", boxes.size() / 4);
