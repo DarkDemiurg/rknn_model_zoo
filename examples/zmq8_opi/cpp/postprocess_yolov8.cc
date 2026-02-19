@@ -221,11 +221,10 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
     std::vector<int> class_ids;
     
     // YOLOv8 split outputs: bbox (64ch), classes (80ch), objectness (1ch) for each scale
-    // Process 3 scales: 80x80, 40x40, 20x20
     for (int scale_idx = 0; scale_idx < 3; scale_idx++) {
-        int bbox_idx = scale_idx * 3;      // 0, 3, 6
-        int class_idx = scale_idx * 3 + 1; // 1, 4, 7
-        int obj_idx = scale_idx * 3 + 2;   // 2, 5, 8
+        int bbox_idx = scale_idx * 3;
+        int class_idx = scale_idx * 3 + 1;
+        int obj_idx = scale_idx * 3 + 2;
         
         if (bbox_idx >= num_outputs || class_idx >= num_outputs || obj_idx >= num_outputs) break;
         
@@ -243,22 +242,15 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
         int grid_h = output_attrs[class_idx].dims[2];
         int grid_w = output_attrs[class_idx].dims[3];
         int bbox_ch = output_attrs[bbox_idx].dims[1];
-        
-        printf("DEBUG: Scale %d - grid %dx%d, bbox_ch=%d\n", scale_idx, grid_h, grid_w, bbox_ch);
-        
         int stride = model_in_h / grid_h;
-        int detections_found = 0;
         
         for (int h = 0; h < grid_h; h++) {
             for (int w = 0; w < grid_w; w++) {
                 int grid_idx = h * grid_w + w;
                 
-                // Get objectness
                 float objectness = deqnt_affine_to_f32(obj_output[grid_idx], obj_zp, obj_scale);
-                
                 if (objectness < conf_threshold) continue;
                 
-                // Find max class score
                 float max_class_score = -1.0f;
                 int max_class_id = -1;
                 
@@ -274,17 +266,13 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
                 float final_score = objectness * max_class_score;
                 if (final_score < conf_threshold) continue;
                 
-                detections_found++;
-                
-                // Decode bbox (DFL format: 64 channels = 4 directions × 16 bins)
                 float bbox[4] = {0};
-                int reg_max = bbox_ch / 4; // 16
+                int reg_max = bbox_ch / 4;
                 
                 for (int k = 0; k < 4; k++) {
                     float sum = 0;
                     float max_val = -1e9;
                     
-                    // Softmax over reg_max bins
                     std::vector<float> vals(reg_max);
                     for (int i = 0; i < reg_max; i++) {
                         int offset = (k * reg_max + i) * grid_h * grid_w + grid_idx;
@@ -305,7 +293,6 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
                     bbox[k] = sum;
                 }
                 
-                // Convert to x1,y1,x2,y2
                 float cx = (w + 0.5f) * stride;
                 float cy = (h + 0.5f) * stride;
                 
@@ -313,11 +300,6 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
                 float y1 = cy - bbox[1] * stride;
                 float x2 = cx + bbox[2] * stride;
                 float y2 = cy + bbox[3] * stride;
-                
-                if (detections_found <= 3) {
-                    printf("DEBUG: Det %d: grid(%d,%d) obj=%.3f cls=%.3f final=%.3f bbox=[%.1f,%.1f,%.1f,%.1f]\n",
-                           detections_found, w, h, objectness, max_class_score, final_score, x1, y1, x2, y2);
-                }
                 
                 boxes.push_back(x1);
                 boxes.push_back(y1);
@@ -327,18 +309,13 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
                 class_ids.push_back(max_class_id);
             }
         }
-        
-        printf("DEBUG: Scale %d found %d detections\n", scale_idx, detections_found);
     }
-    
-    printf("DEBUG: Total detections before NMS: %zu\n", boxes.size() / 4);
     
     if (boxes.empty()) {
         group->count = 0;
         return 0;
     }
     
-    // NMS
     std::vector<int> indices(scores.size());
     for (size_t i = 0; i < indices.size(); i++) indices[i] = i;
     
@@ -365,7 +342,6 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
         }
     }
     
-    // Fill results
     int count = 0;
     for (size_t i = 0; i < keep.size() && count < OBJ_NUMB_MAX_SIZE; i++) {
         if (!keep[i]) continue;
@@ -380,6 +356,5 @@ int post_process_yolov8_multi(int8_t **inputs, int num_outputs,
     }
     
     group->count = count;
-    printf("DEBUG: Final detections after NMS: %d\n", count);
     return 0;
 }
