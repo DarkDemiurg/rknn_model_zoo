@@ -110,6 +110,12 @@ int rkYolov8::init(rknn_context *ctx_in, bool share_weight)
     for (int i = 0; i < io_num.n_output; i++) {
         output_attrs[i].index = i;
         ret = rknn_query(ctx, RKNN_QUERY_OUTPUT_ATTR, &(output_attrs[i]), sizeof(rknn_tensor_attr));
+        
+        printf("output %d: dims=[", i);
+        for (int j = 0; j < output_attrs[i].n_dims; j++) {
+            printf("%d%s", output_attrs[i].dims[j], j < output_attrs[i].n_dims - 1 ? ", " : "");
+        }
+        printf("] n_elems=%d\n", output_attrs[i].n_elems);
     }
 
     if (input_attrs[0].fmt == RKNN_TENSOR_NCHW) {
