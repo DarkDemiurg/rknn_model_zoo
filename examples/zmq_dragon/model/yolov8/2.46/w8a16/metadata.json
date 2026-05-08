@@ -1,0 +1,86 @@
+{
+    "model_id": "yolov8_det",
+    "model_name": "YOLOv8-Detection",
+    "runtime": "qnn_context_binary",
+    "precision": "w8a16",
+    "tool_versions": {
+        "qairt": "2.45.0.260326154327"
+    },
+    "model_files": {
+        "yolov8_det.bin": {
+            "inputs": {
+                "image": {
+                    "shape": [
+                        1,
+                        640,
+                        640,
+                        3
+                    ],
+                    "dtype": "uint16",
+                    "quantization_parameters": {
+                        "scale": 0.000015259021893143654,
+                        "zero_point": 0
+                    },
+                    "io_type": "image",
+                    "image_metadata": {},
+                    "value_range": [
+                        0.0,
+                        1.0
+                    ]
+                }
+            },
+            "outputs": {
+                "scores": {
+                    "shape": [
+                        1,
+                        8400
+                    ],
+                    "dtype": "uint16",
+                    "quantization_parameters": {
+                        "scale": 0.000015199416338873561,
+                        "zero_point": 0
+                    },
+                    "softmax_applied": true,
+                    "labels_file": "coco_labels.txt"
+                },
+                "class_idx": {
+                    "shape": [
+                        1,
+                        8400
+                    ],
+                    "dtype": "uint8",
+                    "labels_file": "coco_labels.txt"
+                },
+                "boxes": {
+                    "shape": [
+                        1,
+                        8400,
+                        4
+                    ],
+                    "dtype": "uint16",
+                    "quantization_parameters": {
+                        "scale": 0.012066011317074299,
+                        "zero_point": 6471
+                    },
+                    "io_type": "bbox",
+                    "bbox_metadata": {}
+                }
+            }
+        }
+    },
+    "supplementary_files": {
+        "labels.txt": "Mapping of model prediction indices -> string labels."
+    },
+    "chipset_attributes": {
+        "aliases": [
+            "qualcomm-qcs6490",
+            "qcs6490"
+        ],
+        "marketing_name": "Qualcomm® QCS6490",
+        "world": "IoT",
+        "htp_version": 68,
+        "soc_model": 93,
+        "reference_device": "Dragonwing RB3 Gen 2 Vision Kit",
+        "name": "qualcomm-qcs6490"
+    }
+}
