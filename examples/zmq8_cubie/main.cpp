@@ -10,11 +10,12 @@
  * Между стадиями используются lock-free очереди для минимизации задержек.
  *
  * Аргументы командной строки:
- *   ./zmq8_cubie <model_path> <source> [-w WIDTH] [-h HEIGHT]
+ *   ./zmq8_cubie <model_path> <source> [-w WIDTH] [-h HEIGHT] [-d STEP]
  *   model_path — путь к .nb файлу модели
  *   source     — номер камеры (0,1,...) или путь к видеофайлу
  *   -w WIDTH   — ширина захвата камеры (по умолчанию 960)
  *   -h HEIGHT  — высота захвата камеры (по умолчанию 720)
+ *   -d STEP    — сохранять отладочные изображения каждые STEP кадров (по умолчанию выкл)
  */
 #include <iostream>
 #include <string>
@@ -161,10 +162,11 @@ static void preprocess_thread_func()
 // ============================================================================
 // Поток inference + ZMQ
 // ============================================================================
-static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock)
+static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug_step)
 {
     double total_time = 0;
     int frame_counter = 0;
+    int total_frames = 0;
 
     while (g_running) {
         PreprocessedFrame pf;
@@ -198,6 +200,24 @@ static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock)
         sock.send(zmq::buffer(msg), zmq::send_flags::sndmore);
         sock.send(zmq::buffer(pf.rgb_data.data(), pf.rgb_data.size()), zmq::send_flags::none);
 
+        // Сохранение отладочного изображения с рамками
+        total_frames++;
+        if (debug_step > 0 && (total_frames % debug_step == 0)) {
+            cv::Mat dbg_img = pf.orig_img.clone();
+            for (auto &det : results) {
+                const char *name = (det.class_id >= 0 && det.class_id < (int)g_classes_name.size())
+                                   ? g_classes_name[det.class_id].c_str() : "?";
+                cv::rectangle(dbg_img, cv::Point((int)det.x1, (int)det.y1),
+                              cv::Point((int)det.x2, (int)det.y2), cv::Scalar(0, 255, 0), 2);
+                sprintf(text, "%s %.0f%%", name, det.confidence * 100);
+                cv::putText(dbg_img, text, cv::Point((int)det.x1, (int)det.y1 - 5),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+            }
+            std::string filename = "debug_" + std::to_string(total_frames) + ".jpg";
+            cv::imwrite(filename, dbg_img);
+            fprintf(stderr, "[Debug] Saved %s (%d detections)\n", filename.c_str(), (int)results.size());
+        }
+
         auto end = std::chrono::steady_clock::now();
         std::chrono::duration<double> diff = end - start;
         total_time += diff.count();
@@ -220,25 +240,28 @@ static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock)
 struct AppConfig {
     int width = DEFAULT_WIDTH;
     int height = DEFAULT_HEIGHT;
+    int debug_step = 0; // 0 = выключено, >0 = сохранять каждые N кадров
 };
 
 static void print_usage(const char *prog)
 {
-    cout << "Usage: " << prog << " <model_path> <source> [-w WIDTH] [-h HEIGHT]" << endl;
+    cout << "Usage: " << prog << " <model_path> <source> [-w WIDTH] [-h HEIGHT] [-d STEP]" << endl;
     cout << "  model_path  - path to .nb model file" << endl;
     cout << "  source      - camera index (0,1,...) or video file path" << endl;
     cout << "  -w WIDTH    - capture width (default " << DEFAULT_WIDTH << ")" << endl;
     cout << "  -h HEIGHT   - capture height (default " << DEFAULT_HEIGHT << ")" << endl;
+    cout << "  -d STEP     - save debug images every STEP frames (default: off)" << endl;
 }
 
 static AppConfig parse_args(int argc, char *argv[])
 {
     AppConfig cfg;
     int opt;
-    while ((opt = getopt(argc, argv, "w:h:")) != -1) {
+    while ((opt = getopt(argc, argv, "w:h:d:")) != -1) {
         switch (opt) {
             case 'w': cfg.width = atoi(optarg); break;
             case 'h': cfg.height = atoi(optarg); break;
+            case 'd': cfg.debug_step = atoi(optarg); break;
         }
     }
     return cfg;
@@ -335,7 +358,7 @@ int main(int argc, char **argv)
     // --- Запуск конвейера ---
     std::thread capture_thread(capture_thread_func, std::ref(vid));
     std::thread preprocess_thread(preprocess_thread_func);
-    std::thread inference_thread(inference_thread_func, std::ref(npu), std::ref(sock));
+    std::thread inference_thread(inference_thread_func, std::ref(npu), std::ref(sock), cfg.debug_step);
 
     // Ожидание завершения
     capture_thread.join();
