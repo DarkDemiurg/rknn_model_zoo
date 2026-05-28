@@ -76,6 +76,7 @@ static void generate_proposals(int stride, const float *feat_grid, const float *
     const int grid_size = grid_w * grid_h;
     const int num_class = CLASS_NUM;
     const float deprob = desigmoid(prob_threshold);
+    const int max_proposals = 100; // Ограничиваем количество proposals на масштаб
 
     for (int idx = 0; idx < grid_size; idx++) {
         // Score для этой ячейки лежит последовательно (HWC)
@@ -101,6 +102,9 @@ static void generate_proposals(int stride, const float *feat_grid, const float *
 
         float score = fast_sigmoid(best_score);
         if (score < prob_threshold) continue;
+
+        // Ограничиваем количество proposals для стабильного FPS
+        if ((int)objects.size() >= max_proposals) return;
 
         int x = idx % grid_w;
         int y = idx / grid_w;
