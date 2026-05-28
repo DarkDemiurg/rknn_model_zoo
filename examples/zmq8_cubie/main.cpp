@@ -164,7 +164,8 @@ static void preprocess_thread_func()
 // ============================================================================
 static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug_step)
 {
-    double total_time = 0;
+    double total_infer_time = 0;
+    double total_loop_time = 0;
     int frame_counter = 0;
     int total_frames = 0;
 
@@ -172,15 +173,21 @@ static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug
         PreprocessedFrame pf;
         if (!g_preprocess_queue.pop(pf)) break;
 
-        auto start = std::chrono::steady_clock::now();
+        auto loop_start = std::chrono::steady_clock::now();
 
-        // NPU inference
+        // NPU inference (только это время считаем для FPS)
+        auto infer_start = std::chrono::steady_clock::now();
+
         std::vector<DetectResult> results;
         int ret = npu.infer(pf.rgb_data.data(), pf.orig_w, pf.orig_h, results);
         if (ret != 0) {
             fprintf(stderr, "[Inference] NPU inference failed\n");
             continue;
         }
+
+        auto infer_end = std::chrono::steady_clock::now();
+        std::chrono::duration<double> infer_diff = infer_end - infer_start;
+        total_infer_time += infer_diff.count();
 
         // Формируем текстовое сообщение с результатами детекции
         std::string msg;
@@ -218,17 +225,20 @@ static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug
             fprintf(stderr, "[Debug] Saved %s (%d detections)\n", filename.c_str(), (int)results.size());
         }
 
-        auto end = std::chrono::steady_clock::now();
-        std::chrono::duration<double> diff = end - start;
-        total_time += diff.count();
+        auto loop_end = std::chrono::steady_clock::now();
+        std::chrono::duration<double> loop_diff = loop_end - loop_start;
+        total_loop_time += loop_diff.count();
         frame_counter++;
 
         // Вывод FPS каждые 30 кадров
         if (frame_counter % 30 == 0) {
-            double avg_fps = frame_counter / total_time;
-            cout << "\t FPS: " << std::fixed << std::setw(11) << std::setprecision(6)
-                 << avg_fps << " time: " << total_time << endl;
-            total_time = 0;
+            double infer_fps = frame_counter / total_infer_time;
+            double loop_fps = frame_counter / total_loop_time;
+            cout << "\t Infer FPS: " << std::fixed << std::setprecision(1) << infer_fps
+                 << "  Loop FPS: " << loop_fps
+                 << "  (infer: " << std::setprecision(1) << (total_infer_time / frame_counter * 1000) << " ms)" << endl;
+            total_infer_time = 0;
+            total_loop_time = 0;
             frame_counter = 0;
         }
     }
