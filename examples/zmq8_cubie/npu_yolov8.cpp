@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <chrono>
 
 NpuYolov8::NpuYolov8() : output_cnt_(0), initialized_(false) {}
 
@@ -46,6 +47,8 @@ int NpuYolov8::infer(unsigned char *input_rgb, int img_w, int img_h,
 {
     if (!initialized_) return -1;
 
+    auto t0 = std::chrono::steady_clock::now();
+
     // Получаем указатель на входной буфер NPU и копируем данные
     void *input_ptr = nullptr;
     unsigned int input_size = 0;
@@ -58,12 +61,16 @@ int NpuYolov8::infer(unsigned char *input_rgb, int img_w, int img_h,
     }
     memcpy(input_ptr, input_rgb, data_size);
 
+    auto t1 = std::chrono::steady_clock::now();
+
     // Настраиваем I/O и запускаем inference
     int ret = network_.network_input_output_set();
     if (ret != 0) return -1;
 
     ret = network_.network_run();
     if (ret != 0) return -1;
+
+    auto t2 = std::chrono::steady_clock::now();
 
     // Получаем выходные данные (zero-copy)
     output_info_s outputs_info[output_cnt_];
@@ -76,6 +83,18 @@ int NpuYolov8::infer(unsigned char *input_rgb, int img_w, int img_h,
 
     // Постпроцессинг
     postprocess_yolov8_6(output_data, img_w, img_h, results);
+
+    auto t3 = std::chrono::steady_clock::now();
+
+    // Печатаем детальный тайминг раз в 100 кадров
+    static int cnt = 0;
+    if (++cnt % 100 == 0) {
+        double ms_copy = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        double ms_npu  = std::chrono::duration<double, std::milli>(t2 - t1).count();
+        double ms_post = std::chrono::duration<double, std::milli>(t3 - t2).count();
+        fprintf(stderr, "[NPU timing] memcpy: %.1f ms, npu_run: %.1f ms, postproc: %.1f ms\n",
+                ms_copy, ms_npu, ms_post);
+    }
 
     return 0;
 }
