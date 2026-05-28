@@ -162,7 +162,8 @@ static void preprocess_thread_func()
 // ============================================================================
 // Поток inference + ZMQ
 // ============================================================================
-static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug_step)
+static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug_step,
+                                  const std::vector<int> &class_filter)
 {
     double total_infer_time = 0;
     double total_loop_time = 0;
@@ -179,7 +180,7 @@ static void inference_thread_func(NpuYolov8 &npu, zmq::socket_t &sock, int debug
         auto infer_start = std::chrono::steady_clock::now();
 
         std::vector<DetectResult> results;
-        int ret = npu.infer(pf.rgb_data.data(), pf.orig_w, pf.orig_h, results);
+        int ret = npu.infer(pf.rgb_data.data(), pf.orig_w, pf.orig_h, results, class_filter);
         if (ret != 0) {
             fprintf(stderr, "[Inference] NPU inference failed\n");
             continue;
@@ -251,27 +252,63 @@ struct AppConfig {
     int width = DEFAULT_WIDTH;
     int height = DEFAULT_HEIGHT;
     int debug_step = 0; // 0 = выключено, >0 = сохранять каждые N кадров
+    std::vector<int> class_filter; // Пустой = все классы, иначе только указанные
 };
 
 static void print_usage(const char *prog)
 {
-    cout << "Usage: " << prog << " <model_path> <source> [-w WIDTH] [-h HEIGHT] [-d STEP]" << endl;
+    cout << "Usage: " << prog << " <model_path> <source> [-w WIDTH] [-h HEIGHT] [-d STEP] [-c CLASSES]" << endl;
     cout << "  model_path  - path to .nb model file" << endl;
     cout << "  source      - camera index (0,1,...) or video file path" << endl;
     cout << "  -w WIDTH    - capture width (default " << DEFAULT_WIDTH << ")" << endl;
     cout << "  -h HEIGHT   - capture height (default " << DEFAULT_HEIGHT << ")" << endl;
     cout << "  -d STEP     - save debug images every STEP frames (default: off)" << endl;
+    cout << "  -c CLASSES  - comma-separated class filter (names or IDs, e.g. \"person,car\" or \"0,2\")" << endl;
+}
+
+/**
+ * Парсит строку классов: "person,car,0,15" → вектор индексов.
+ * Поддерживает имена классов и числовые ID.
+ */
+static std::vector<int> parse_classes(const char *str)
+{
+    std::vector<int> result;
+    std::string s(str);
+    size_t pos = 0;
+    while (pos < s.size()) {
+        size_t comma = s.find(',', pos);
+        if (comma == std::string::npos) comma = s.size();
+        std::string token = s.substr(pos, comma - pos);
+        pos = comma + 1;
+
+        // Пробуем как число
+        char *end;
+        long id = strtol(token.c_str(), &end, 10);
+        if (*end == '\0' && id >= 0 && id < CLASS_NUM) {
+            result.push_back((int)id);
+        } else {
+            // Ищем по имени
+            for (int i = 0; i < (int)g_classes_name.size(); i++) {
+                if (g_classes_name[i] == token) {
+                    result.push_back(i);
+                    break;
+                }
+            }
+        }
+    }
+    return result;
 }
 
 static AppConfig parse_args(int argc, char *argv[])
 {
     AppConfig cfg;
     int opt;
-    while ((opt = getopt(argc, argv, "w:h:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "w:h:d:c:")) != -1) {
         switch (opt) {
             case 'w': cfg.width = atoi(optarg); break;
             case 'h': cfg.height = atoi(optarg); break;
             case 'd': cfg.debug_step = atoi(optarg); break;
+            case 'c': cfg.class_filter = parse_classes(optarg); break;
         }
     }
     return cfg;
@@ -292,6 +329,12 @@ int main(int argc, char **argv)
 
     AppConfig cfg = parse_args(argc, argv);
     cout << "Camera resolution: [" << cfg.width << "x" << cfg.height << "]" << endl;
+    if (!cfg.class_filter.empty()) {
+        cout << "Class filter: ";
+        for (int id : cfg.class_filter)
+            cout << g_classes_name[id] << "(" << id << ") ";
+        cout << endl;
+    }
 
     // --- Инициализация G2D ---
     g2d_init();
@@ -369,7 +412,8 @@ int main(int argc, char **argv)
     // --- Запуск конвейера ---
     std::thread capture_thread(capture_thread_func, std::ref(vid));
     std::thread preprocess_thread(preprocess_thread_func);
-    std::thread inference_thread(inference_thread_func, std::ref(npu), std::ref(sock), cfg.debug_step);
+    std::thread inference_thread(inference_thread_func, std::ref(npu), std::ref(sock),
+                                  cfg.debug_step, std::cref(cfg.class_filter));
 
     // Ожидание завершения
     capture_thread.join();

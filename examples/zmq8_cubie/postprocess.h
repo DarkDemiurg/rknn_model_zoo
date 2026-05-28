@@ -19,15 +19,16 @@ struct DetectResult {
 
 /**
  * Постпроцессинг 6 выходов YOLOv8 (Allwinner NPU формат).
- * Выходы: [grid_8, score_8, grid_16, score_16, grid_32, score_32]
  *
  * @param output        Массив указателей на float-выходы NPU (6 штук)
  * @param img_w         Ширина исходного изображения
  * @param img_h         Высота исходного изображения
  * @param results       Вектор результатов детекции
+ * @param class_filter  Фильтр классов (пустой = все классы)
  * @return              Количество детекций
  */
 int postprocess_yolov8_6(float **output, int img_w, int img_h,
-                         std::vector<DetectResult> &results);
+                         std::vector<DetectResult> &results,
+                         const std::vector<int> &class_filter = {});
 
 #endif

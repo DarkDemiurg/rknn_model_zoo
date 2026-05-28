@@ -43,7 +43,8 @@ int NpuYolov8::init(const std::string &model_path)
 }
 
 int NpuYolov8::infer(unsigned char *input_rgb, int img_w, int img_h,
-                     std::vector<DetectResult> &results)
+                     std::vector<DetectResult> &results,
+                     const std::vector<int> &class_filter)
 {
     if (!initialized_) return -1;
 
@@ -82,13 +83,13 @@ int NpuYolov8::infer(unsigned char *input_rgb, int img_w, int img_h,
     }
 
     // Постпроцессинг
-    postprocess_yolov8_6(output_data, img_w, img_h, results);
+    postprocess_yolov8_6(output_data, img_w, img_h, results, class_filter);
 
     auto t3 = std::chrono::steady_clock::now();
 
     // Печатаем детальный тайминг раз в 100 кадров
     static int cnt = 0;
-    if (++cnt % 100 == 0) {
+    if (++cnt % 300 == 0) {
         double ms_copy = std::chrono::duration<double, std::milli>(t1 - t0).count();
         double ms_npu  = std::chrono::duration<double, std::milli>(t2 - t1).count();
         double ms_post = std::chrono::duration<double, std::milli>(t3 - t2).count();

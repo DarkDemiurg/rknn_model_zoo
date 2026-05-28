@@ -69,7 +69,8 @@ static float iou(const Object &a, const Object &b)
  * где idx = y * grid_w + x
  */
 static void generate_proposals(int stride, const float *feat_grid, const float *feat_score,
-                               float prob_threshold, std::vector<Object> &objects)
+                               float prob_threshold, std::vector<Object> &objects,
+                               const std::vector<int> &class_filter)
 {
     const int grid_w = LETTERBOX_COLS / stride;
     const int grid_h = LETTERBOX_ROWS / stride;
@@ -77,25 +78,37 @@ static void generate_proposals(int stride, const float *feat_grid, const float *
     const int num_class = CLASS_NUM;
     const float deprob = desigmoid(prob_threshold);
     const int max_proposals = 100; // Ограничиваем количество proposals на масштаб
+    const bool filter_active = !class_filter.empty();
 
     for (int idx = 0; idx < grid_size; idx++) {
         // Score для этой ячейки лежит последовательно (HWC)
         const float *scores = feat_score + idx * num_class;
 
-        // Быстрый поиск максимума с ранним выходом
-        // Проверяем по 4 элемента за раз
+        // Быстрый поиск максимума — только по нужным классам
         float best_score = -FLT_MAX;
         int best_class = 0;
-        int c = 0;
-        for (; c + 3 < num_class; c += 4) {
-            float s0 = scores[c], s1 = scores[c+1], s2 = scores[c+2], s3 = scores[c+3];
-            if (s0 > best_score) { best_score = s0; best_class = c; }
-            if (s1 > best_score) { best_score = s1; best_class = c+1; }
-            if (s2 > best_score) { best_score = s2; best_class = c+2; }
-            if (s3 > best_score) { best_score = s3; best_class = c+3; }
-        }
-        for (; c < num_class; c++) {
-            if (scores[c] > best_score) { best_score = scores[c]; best_class = c; }
+
+        if (filter_active) {
+            // Проверяем только указанные классы (очень быстро)
+            for (int c : class_filter) {
+                if (scores[c] > best_score) {
+                    best_score = scores[c];
+                    best_class = c;
+                }
+            }
+        } else {
+            // Все классы
+            int c = 0;
+            for (; c + 3 < num_class; c += 4) {
+                float s0 = scores[c], s1 = scores[c+1], s2 = scores[c+2], s3 = scores[c+3];
+                if (s0 > best_score) { best_score = s0; best_class = c; }
+                if (s1 > best_score) { best_score = s1; best_class = c+1; }
+                if (s2 > best_score) { best_score = s2; best_class = c+2; }
+                if (s3 > best_score) { best_score = s3; best_class = c+3; }
+            }
+            for (; c < num_class; c++) {
+                if (scores[c] > best_score) { best_score = scores[c]; best_class = c; }
+            }
         }
 
         if (best_score < deprob) continue;
@@ -129,16 +142,17 @@ static void generate_proposals(int stride, const float *feat_grid, const float *
 }
 
 int postprocess_yolov8_6(float **output, int img_w, int img_h,
-                         std::vector<DetectResult> &results)
+                         std::vector<DetectResult> &results,
+                         const std::vector<int> &class_filter)
 {
     results.clear();
 
     std::vector<Object> proposals;
     proposals.reserve(256);
 
-    generate_proposals(8,  output[0], output[1], SCORE_THRESHOLD, proposals);
-    generate_proposals(16, output[2], output[3], SCORE_THRESHOLD, proposals);
-    generate_proposals(32, output[4], output[5], SCORE_THRESHOLD, proposals);
+    generate_proposals(32, output[4], output[5], SCORE_THRESHOLD, proposals, class_filter);
+    generate_proposals(16, output[2], output[3], SCORE_THRESHOLD, proposals, class_filter);
+    generate_proposals(8,  output[0], output[1], SCORE_THRESHOLD, proposals, class_filter);
 
     // Сортировка
     std::sort(proposals.begin(), proposals.end(),

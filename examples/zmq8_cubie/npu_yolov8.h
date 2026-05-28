@@ -25,14 +25,16 @@ public:
 
     /**
      * Запуск inference на подготовленных данных.
-     * @param input_rgb  Указатель на RGB данные (640x640x3, uint8)
-     * @param img_w      Ширина оригинального изображения (для обратного маппинга координат)
-     * @param img_h      Высота оригинального изображения
-     * @param results    Вектор результатов детекции
+     * @param input_rgb    Указатель на RGB данные (640x640x3, uint8)
+     * @param img_w        Ширина оригинального изображения
+     * @param img_h        Высота оригинального изображения
+     * @param results      Вектор результатов детекции
+     * @param class_filter Фильтр классов (пустой = все)
      * @return 0 при успехе
      */
     int infer(unsigned char *input_rgb, int img_w, int img_h,
-              std::vector<DetectResult> &results);
+              std::vector<DetectResult> &results,
+              const std::vector<int> &class_filter = {});
 
 private:
     NpuUint npu_unit_;
