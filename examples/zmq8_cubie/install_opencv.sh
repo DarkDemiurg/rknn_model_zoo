@@ -40,6 +40,11 @@ mkdir -p /usr/local/lib
 cp -d ${OPENCV_DIR}/lib/libopencv* /usr/local/lib/
 echo "Libraries installed to /usr/local/lib/"
 
+# Копируем 3rdparty зависимости OpenCV
+mkdir -p /usr/local/lib/opencv4/3rdparty
+cp ${OPENCV_DIR}/lib/opencv4/3rdparty/* /usr/local/lib/opencv4/3rdparty/
+echo "3rdparty libs installed to /usr/local/lib/opencv4/3rdparty/"
+
 # Копируем cmake конфиги
 mkdir -p /usr/local/lib/cmake
 cp -r ${OPENCV_DIR}/lib/cmake/opencv4 /usr/local/lib/cmake/
