@@ -20,6 +20,9 @@ if(NATIVE_BUILD)
     # ==========================================================================
     message(STATUS "=== NATIVE BUILD on target ===")
 
+    # ABI совместимость с предсобранным OpenCV
+    add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
+
     # OpenCV — системный
     find_package(OpenCV REQUIRED)
 
