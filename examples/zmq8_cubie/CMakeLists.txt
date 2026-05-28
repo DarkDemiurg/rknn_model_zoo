@@ -31,9 +31,11 @@ if(NATIVE_BUILD)
         PATHS ${CMAKE_SOURCE_DIR}/3rdparty/zmq/include /usr/include /usr/local/include
     )
 
-    # NPU Runtime — системные библиотеки на плате
-    find_library(NPU_LIB_HAL NAMES VIPhal PATHS /usr/lib /usr/local/lib)
-    find_library(NPU_LIB_LINKER NAMES NBGlinker PATHS /usr/lib /usr/local/lib)
+    # NPU Runtime — системные библиотеки или из 3rdparty/npu_lib/
+    find_library(NPU_LIB_HAL NAMES VIPhal
+        PATHS /usr/lib /usr/local/lib ${CMAKE_SOURCE_DIR}/3rdparty/npu_lib NO_DEFAULT_PATH)
+    find_library(NPU_LIB_LINKER NAMES NBGlinker
+        PATHS /usr/lib /usr/local/lib ${CMAKE_SOURCE_DIR}/3rdparty/npu_lib NO_DEFAULT_PATH)
     set(NPU_RT_LIBS ${NPU_LIB_HAL} ${NPU_LIB_LINKER})
 
     # NPU runtime source (npulib.cpp, npu_util.cpp) — лежат в npu_src/
