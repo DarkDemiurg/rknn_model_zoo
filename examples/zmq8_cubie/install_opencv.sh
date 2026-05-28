@@ -22,38 +22,32 @@ rm -rf ${TMPDIR}
 mkdir -p ${TMPDIR}
 unzip -q ${ARCHIVE} -d ${TMPDIR}
 
-# Определяем корневую папку внутри архива
-OPENCV_DIR=$(find ${TMPDIR} -maxdepth 1 -type d -name "opencv*" | head -1)
-if [ -z "${OPENCV_DIR}" ]; then
-    OPENCV_DIR=${TMPDIR}
+OPENCV_DIR=${TMPDIR}/opencv-4.9.0-aarch64-linux-sunxi-glibc
+if [ ! -d "${OPENCV_DIR}" ]; then
+    echo "ERROR: Expected dir not found: ${OPENCV_DIR}"
+    exit 1
 fi
 
 echo "Source dir: ${OPENCV_DIR}"
 
 # Копируем заголовки
-if [ -d "${OPENCV_DIR}/include" ]; then
-    cp -r ${OPENCV_DIR}/include/opencv4 /usr/local/include/ 2>/dev/null || \
-    cp -r ${OPENCV_DIR}/include/* /usr/local/include/
-    echo "Headers installed to /usr/local/include/"
-fi
+mkdir -p /usr/local/include
+cp -r ${OPENCV_DIR}/include/opencv4 /usr/local/include/
+echo "Headers installed to /usr/local/include/opencv4/"
 
 # Копируем библиотеки
-if [ -d "${OPENCV_DIR}/lib" ]; then
-    cp -d ${OPENCV_DIR}/lib/libopencv* /usr/local/lib/
-    echo "Libraries installed to /usr/local/lib/"
-fi
+mkdir -p /usr/local/lib
+cp -d ${OPENCV_DIR}/lib/libopencv* /usr/local/lib/
+echo "Libraries installed to /usr/local/lib/"
 
 # Копируем cmake конфиги
-if [ -d "${OPENCV_DIR}/lib/cmake" ]; then
-    cp -r ${OPENCV_DIR}/lib/cmake/opencv4 /usr/local/lib/cmake/ 2>/dev/null || \
-    mkdir -p /usr/local/lib/cmake && cp -r ${OPENCV_DIR}/lib/cmake/opencv4 /usr/local/lib/cmake/
-    echo "CMake configs installed to /usr/local/lib/cmake/opencv4/"
-fi
+mkdir -p /usr/local/lib/cmake
+cp -r ${OPENCV_DIR}/lib/cmake/opencv4 /usr/local/lib/cmake/
+echo "CMake configs installed to /usr/local/lib/cmake/opencv4/"
 
 # Обновляем кэш линковщика
-ldconfig
+/sbin/ldconfig 2>/dev/null || ldconfig 2>/dev/null || echo "Warning: ldconfig not found, run manually: sudo /sbin/ldconfig"
 
 rm -rf ${TMPDIR}
 
 echo "=== OpenCV 4.9.0 installed successfully ==="
-echo "Verify: pkg-config --modversion opencv4"
