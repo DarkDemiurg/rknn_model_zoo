@@ -16,7 +16,7 @@
 #define LETTERBOX_COLS      640
 
 // Пороги детекции
-#define SCORE_THRESHOLD     0.4f
+#define SCORE_THRESHOLD     0.5f
 #define NMS_THRESHOLD       0.45f
 
 static const std::vector<std::string> g_classes_name{

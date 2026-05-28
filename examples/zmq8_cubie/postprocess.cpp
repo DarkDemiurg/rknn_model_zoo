@@ -81,14 +81,20 @@ static void generate_proposals(int stride, const float *feat_grid, const float *
         // Score для этой ячейки лежит последовательно (HWC)
         const float *scores = feat_score + idx * num_class;
 
-        // Находим максимальный score
-        float best_score = scores[0];
+        // Быстрый поиск максимума с ранним выходом
+        // Проверяем по 4 элемента за раз
+        float best_score = -FLT_MAX;
         int best_class = 0;
-        for (int c = 1; c < num_class; c++) {
-            if (scores[c] > best_score) {
-                best_score = scores[c];
-                best_class = c;
-            }
+        int c = 0;
+        for (; c + 3 < num_class; c += 4) {
+            float s0 = scores[c], s1 = scores[c+1], s2 = scores[c+2], s3 = scores[c+3];
+            if (s0 > best_score) { best_score = s0; best_class = c; }
+            if (s1 > best_score) { best_score = s1; best_class = c+1; }
+            if (s2 > best_score) { best_score = s2; best_class = c+2; }
+            if (s3 > best_score) { best_score = s3; best_class = c+3; }
+        }
+        for (; c < num_class; c++) {
+            if (scores[c] > best_score) { best_score = scores[c]; best_class = c; }
         }
 
         if (best_score < deprob) continue;

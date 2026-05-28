@@ -324,10 +324,11 @@ int main(int argc, char **argv)
         vid.open(pipeline, CAP_GSTREAMER);
 
         if (!vid.isOpened()) {
-            // Fallback: прямое открытие камеры
-            cout << "GStreamer failed, trying direct V4L2..." << endl;
-            vid.open(cam);
+            // Fallback: V4L2 с MJPEG fourcc
+            cout << "GStreamer failed, trying V4L2 MJPEG..." << endl;
+            vid.open(cam, CAP_V4L2);
             if (vid.isOpened()) {
+                vid.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M','J','P','G'));
                 vid.set(CAP_PROP_FRAME_WIDTH, cfg.width);
                 vid.set(CAP_PROP_FRAME_HEIGHT, cfg.height);
                 vid.set(CAP_PROP_FPS, FPS);
