@@ -41,6 +41,9 @@ typedef struct {
     int model_width;
     int model_height;
     bool is_quant;
+    // Pre-allocated input buffer (avoids malloc/free every frame)
+    unsigned char* input_buf;
+    int input_buf_size;
 } rknn_app_context_t;
 
 #include "postprocess.h"

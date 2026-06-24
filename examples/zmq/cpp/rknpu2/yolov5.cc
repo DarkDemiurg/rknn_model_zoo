@@ -132,11 +132,25 @@ int init_yolov5_model(const char *model_path, rknn_app_context_t *app_ctx)
     printf("model input height=%d, width=%d, channel=%d\n",
            app_ctx->model_height, app_ctx->model_width, app_ctx->model_channel);
 
+    // Pre-allocate input buffer once (reused every frame)
+    app_ctx->input_buf_size = app_ctx->model_width * app_ctx->model_height * app_ctx->model_channel;
+    app_ctx->input_buf = (unsigned char *)malloc(app_ctx->input_buf_size);
+    if (app_ctx->input_buf == NULL)
+    {
+        printf("malloc input_buf fail!\n");
+        return -1;
+    }
+
     return 0;
 }
 
 int release_yolov5_model(rknn_app_context_t *app_ctx)
 {
+    if (app_ctx->input_buf != NULL)
+    {
+        free(app_ctx->input_buf);
+        app_ctx->input_buf = NULL;
+    }
     if (app_ctx->input_attrs != NULL)
     {
         free(app_ctx->input_attrs);
@@ -177,17 +191,12 @@ int inference_yolov5_model(rknn_app_context_t *app_ctx, image_buffer_t *img, obj
     memset(inputs, 0, sizeof(inputs));
     memset(outputs, 0, sizeof(outputs));
 
-    // Pre Process
+    // Pre Process — use pre-allocated buffer (no malloc/free per frame)
     dst_img.width = app_ctx->model_width;
     dst_img.height = app_ctx->model_height;
     dst_img.format = IMAGE_FORMAT_RGB888;
-    dst_img.size = get_image_size(&dst_img);
-    dst_img.virt_addr = (unsigned char *)malloc(dst_img.size);
-    if (dst_img.virt_addr == NULL)
-    {
-        printf("malloc buffer size:%d fail!\n", dst_img.size);
-        return -1;
-    }
+    dst_img.size = app_ctx->input_buf_size;
+    dst_img.virt_addr = app_ctx->input_buf;
 
     // letterbox
     ret = convert_image_with_letterbox(img, &dst_img, &letter_box, bg_color);
@@ -201,8 +210,8 @@ int inference_yolov5_model(rknn_app_context_t *app_ctx, image_buffer_t *img, obj
     inputs[0].index = 0;
     inputs[0].type = RKNN_TENSOR_UINT8;
     inputs[0].fmt = RKNN_TENSOR_NHWC;
-    inputs[0].size = app_ctx->model_width * app_ctx->model_height * app_ctx->model_channel;
-    inputs[0].buf = dst_img.virt_addr;
+    inputs[0].size = app_ctx->input_buf_size;
+    inputs[0].buf = app_ctx->input_buf;
 
     ret = rknn_inputs_set(app_ctx->rknn_ctx, app_ctx->io_num.n_input, inputs);
     if (ret < 0)
@@ -212,7 +221,6 @@ int inference_yolov5_model(rknn_app_context_t *app_ctx, image_buffer_t *img, obj
     }
 
     // Run
-    //printf("rknn_run\n");
     ret = rknn_run(app_ctx->rknn_ctx, nullptr);
     if (ret < 0)
     {
@@ -237,14 +245,9 @@ int inference_yolov5_model(rknn_app_context_t *app_ctx, image_buffer_t *img, obj
     // Post Process
     post_process(app_ctx, outputs, &letter_box, box_conf_threshold, nms_threshold, od_results);
 
-    // Remeber to release rknn output
+    // Release rknn output
     rknn_outputs_release(app_ctx->rknn_ctx, app_ctx->io_num.n_output, outputs);
 
 out:
-    if (dst_img.virt_addr != NULL)
-    {
-        free(dst_img.virt_addr);
-    }
-
     return ret;
 }
