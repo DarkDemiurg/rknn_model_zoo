@@ -162,45 +162,25 @@ int main(int argc, char **argv)
     if (isdigit(*source)) {
         int cam = (int)strtol(source, nullptr, 10);
 
-        // Try MJPEG pipeline first (lowest CPU decode overhead)
         stringstream ss;
         ss << "v4l2src device=/dev/video" << cam
            << " ! image/jpeg, width=" << res.width << ", height=" << res.height
            << " ! jpegdec ! videoconvert"
            << " ! video/x-raw, format=BGR"
            << " ! appsink drop=true sync=false";
-        cout << "GStreamer MJPEG pipeline:\n\t" << ss.str() << endl;
+        cout << "GStreamer pipeline:\n\t" << ss.str() << endl;
         vid.open(ss.str(), CAP_GSTREAMER);
 
         if (!vid.isOpened()) {
-            // Fallback: try without explicit size constraint (let camera pick closest mode)
-            stringstream ss2;
-            ss2 << "v4l2src device=/dev/video" << cam
-                << " ! image/jpeg"
-                << " ! jpegdec ! videoconvert"
-                << " ! video/x-raw, format=BGR"
-                << " ! appsink drop=true sync=false";
-            cout << "GStreamer MJPEG (no size) pipeline:\n\t" << ss2.str() << endl;
-            vid.open(ss2.str(), CAP_GSTREAMER);
-        }
-
-        if (!vid.isOpened()) {
-            // Fallback: raw V4L2 with MJPEG fourcc
-            cout << "GStreamer failed, trying V4L2 with MJPEG fourcc" << endl;
-            vid.open(cam, CAP_V4L2);
-            if (vid.isOpened()) {
-                vid.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M','J','P','G'));
-                vid.set(CAP_PROP_FRAME_WIDTH, res.width);
-                vid.set(CAP_PROP_FRAME_HEIGHT, res.height);
-                double actual_w = vid.get(CAP_PROP_FRAME_WIDTH);
-                double actual_h = vid.get(CAP_PROP_FRAME_HEIGHT);
-                double actual_fps = vid.get(CAP_PROP_FPS);
-                cout << "V4L2 MJPEG opened: " << actual_w << "x" << actual_h
-                     << " @ " << actual_fps << " FPS" << endl;
-            } else {
-                cerr << "Can't open camera!" << endl;
-                return 1;
-            }
+            cout << "GStreamer failed, trying direct open" << endl;
+            vid.open(cam);
+            if (!vid.isOpened()) { cerr << "Can't open camera!" << endl; return 1; }
+            vid.set(CAP_PROP_FRAME_WIDTH, res.width);
+            vid.set(CAP_PROP_FRAME_HEIGHT, res.height);
+            cout << "Camera opened: "
+                 << vid.get(CAP_PROP_FRAME_WIDTH) << "x"
+                 << vid.get(CAP_PROP_FRAME_HEIGHT)
+                 << " @ " << vid.get(CAP_PROP_FPS) << " FPS" << endl;
         } else {
             cout << "GStreamer camera opened." << endl;
         }
