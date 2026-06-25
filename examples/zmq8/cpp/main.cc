@@ -222,15 +222,18 @@ int main(int argc, char **argv)
     double total_time = 0;
     int frame_counter = 0;
 
+    // Per-stage timing accumulators (printed every 30 frames)
+    double t_wait = 0, t_copy = 0, t_set = 0, t_run = 0, t_get = 0, t_post = 0, t_zmq = 0;
+
     while (g_running) {
         auto t0 = std::chrono::steady_clock::now();
 
         PreparedFrame pf;
         if (!g_frame_queue.pop(pf)) break;
 
-        // Feed the pre-scaled RGB frame directly to RKNN —
-        // no letterbox needed here, capture thread already did it.
-        // We reuse the pre-allocated input_buf for the RKNN copy.
+        auto t1 = std::chrono::steady_clock::now();
+
+        // Feed the pre-scaled RGB frame directly to RKNN
         size_t frame_bytes = pf.scaled.total() * pf.scaled.elemSize();
         if (!pf.scaled.isContinuous() || (int)frame_bytes != rknn_app_ctx.input_buf_size) {
             cerr << "Frame size mismatch: " << frame_bytes << " vs " << rknn_app_ctx.input_buf_size << endl;
@@ -238,7 +241,8 @@ int main(int argc, char **argv)
         }
         memcpy(rknn_app_ctx.input_buf, pf.scaled.data, rknn_app_ctx.input_buf_size);
 
-        // Run inference directly on pre-allocated buffer (skip letterbox in inference_*)
+        auto t2 = std::chrono::steady_clock::now();
+
         rknn_input inputs[1];
         memset(inputs, 0, sizeof(inputs));
         inputs[0].index = 0;
@@ -250,8 +254,12 @@ int main(int argc, char **argv)
         ret = rknn_inputs_set(rknn_app_ctx.rknn_ctx, rknn_app_ctx.io_num.n_input, inputs);
         if (ret < 0) { cerr << "rknn_inputs_set fail ret=" << ret << endl; break; }
 
+        auto t3 = std::chrono::steady_clock::now();
+
         ret = rknn_run(rknn_app_ctx.rknn_ctx, nullptr);
         if (ret < 0) { cerr << "rknn_run fail ret=" << ret << endl; break; }
+
+        auto t4 = std::chrono::steady_clock::now();
 
         rknn_output outputs[rknn_app_ctx.io_num.n_output];
         memset(outputs, 0, sizeof(outputs));
@@ -262,9 +270,20 @@ int main(int argc, char **argv)
         ret = rknn_outputs_get(rknn_app_ctx.rknn_ctx, rknn_app_ctx.io_num.n_output, outputs, NULL);
         if (ret < 0) { cerr << "rknn_outputs_get fail ret=" << ret << endl; break; }
 
+        auto t5 = std::chrono::steady_clock::now();
+
         object_detect_result_list od_results;
         post_process(&rknn_app_ctx, outputs, &letter_box, BOX_THRESH, NMS_THRESH, &od_results);
         rknn_outputs_release(rknn_app_ctx.rknn_ctx, rknn_app_ctx.io_num.n_output, outputs);
+
+        auto t6 = std::chrono::steady_clock::now();
+
+        t_wait += std::chrono::duration<double, std::milli>(t1 - t0).count();
+        t_copy += std::chrono::duration<double, std::milli>(t2 - t1).count();
+        t_set  += std::chrono::duration<double, std::milli>(t3 - t2).count();
+        t_run  += std::chrono::duration<double, std::milli>(t4 - t3).count();
+        t_get  += std::chrono::duration<double, std::milli>(t5 - t4).count();
+        t_post += std::chrono::duration<double, std::milli>(t6 - t5).count();
 
         string msg;
         for (int i = 0; i < od_results.count; i++) {
@@ -282,17 +301,29 @@ int main(int argc, char **argv)
         sock.send(zmq::buffer(rknn_app_ctx.input_buf, rknn_app_ctx.input_buf_size),
                   zmq::send_flags::none);
 
-        auto t1 = std::chrono::steady_clock::now();
-        total_time += std::chrono::duration<double>(t1 - t0).count();
+        auto t7 = std::chrono::steady_clock::now();
+        t_zmq += std::chrono::duration<double, std::milli>(t7 - t6).count();
+
+        total_time += std::chrono::duration<double>(t7 - t0).count();
         frame_counter++;
 
         if (frame_counter % 30 == 0) {
+            double n = frame_counter;
             cout << "\t FPS: " << std::fixed << std::setprecision(2)
                  << (frame_counter / total_time)
                  << "  avg_ms: " << std::setprecision(1)
-                 << (total_time / frame_counter * 1000) << endl;
-            total_time   = 0;
+                 << (total_time / n * 1000) << endl;
+            cout << "\t  wait=" << t_wait/n
+                 << " copy=" << t_copy/n
+                 << " inputs_set=" << t_set/n
+                 << " npu_run=" << t_run/n
+                 << " outputs_get=" << t_get/n
+                 << " postproc=" << t_post/n
+                 << " zmq=" << t_zmq/n
+                 << " ms" << endl;
+            total_time = 0;
             frame_counter = 0;
+            t_wait=t_copy=t_set=t_run=t_get=t_post=t_zmq=0;
         }
     }
 
