@@ -134,9 +134,8 @@ static void capture_thread_func(VideoCapture &vid)
         CapturedFrame frame;
         vid >> frame.img;
         if (frame.img.empty()) {
-            fprintf(stderr, "[Capture] Empty frame, stopping\n");
-            g_running = false;
-            break;
+            fprintf(stderr, "[Capture] Empty frame, skipping\n");
+            continue;
         }
 
         batch_count++;
